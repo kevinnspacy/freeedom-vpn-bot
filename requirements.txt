@@ -4,7 +4,7 @@ aiogram-dialog==2.2.0
 
 # Database
 sqlalchemy==2.0.36
-asyncpg==0.30.0
+aiosqlite==0.20.0
 alembic==1.14.0
 
 # Web Framework (Admin Panel)
@@ -26,8 +26,6 @@ pydantic==2.10.5
 pydantic-settings==2.7.0
 
 # Utils
-redis==5.2.1
-celery==5.4.0
 apscheduler==3.10.4
 
 # Security
