@@ -28,11 +28,7 @@ class Settings(BaseSettings):
     # VPN Server
     VPN_SERVER_HOST: str = "107.189.23.38"
 
-    # Legacy Shadowsocks (deprecated, kept for compatibility)
-    SS_SERVER_HOST: str = "107.189.23.38"
-    SS_SERVER_PORT: int = 8388
-    SS_METHOD: str = "chacha20-ietf-poly1305"
-    SS_API_URL: str = ""
+
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"

@@ -41,14 +41,9 @@ class Subscription(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, index=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, index=True)
 
-    # Marzban (VLESS + Reality) - новая система
-    marzban_username: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True, index=True)
-    subscription_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-
-    # Legacy Shadowsocks credentials (deprecated)
-    ss_port: Mapped[int | None] = mapped_column(Integer, unique=True, nullable=True)
-    ss_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    ss_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Marzban (VLESS + Reality)
+    marzban_username: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    subscription_url: Mapped[str] = mapped_column(String(500))
 
     # Subscription details
     plan_type: Mapped[str] = mapped_column(String(50))  # trial, day, week, month, year
