@@ -6,7 +6,7 @@ import httpx
 import secrets
 import string
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from loguru import logger
 from config import settings
 
@@ -134,6 +134,18 @@ class MarzbanService:
         except httpx.HTTPStatusError as e:
             logger.error(f"Failed to create Marzban user: {e.response.text}")
             raise
+
+    async def get_all_users(self) -> List[Dict[str, Any]]:
+        """Получить всех пользователей"""
+        try:
+            # Endpoint /api/users returns list of users
+            # Need to handle pagination if Marzban uses it. 
+            # Marzban API /api/users returns {users: [...], total: ...}
+            response = await self._request("GET", "/api/users")
+            return response.get("users", [])
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to get all users: {e}")
+            return []
 
     async def get_user(self, username: str) -> Optional[Dict[str, Any]]:
         """Получить данные пользователя"""

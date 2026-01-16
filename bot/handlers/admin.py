@@ -7,6 +7,7 @@ from datetime import datetime
 from database.database import AsyncSessionLocal
 from database.models import User, Subscription, Payment, SubscriptionStatus, PaymentStatus
 from services.user_service import UserService
+from services.marzban_service import marzban_service
 from bot.keyboards.inline import admin_panel_keyboard
 from config import settings
 
@@ -75,11 +76,20 @@ async def show_admin_stats(callback: CallbackQuery):
             )
         ) or 0
 
+        # Трафик из Marzban
+        marzban_users = await marzban_service.get_all_users()
+        total_traffic_bytes = sum(u.get("used_traffic", 0) for u in marzban_users)
+        total_traffic_gb = total_traffic_bytes / (1024 ** 3)
+        total_traffic_formatted = f"{total_traffic_gb:.2f} GB"
+        if total_traffic_gb > 1024:
+            total_traffic_formatted = f"{total_traffic_gb / 1024:.2f} TB"
+
     stats_text = f"""
 📊 Статистика
 
 👥 Всего пользователей: {total_users}
 ✅ Активных подписок: {active_subscriptions}
+🌐 Использовано трафика: {total_traffic_formatted}
 
 💰 Платежей сегодня: {payments_today}
 💵 Выручка сегодня: {revenue_today:.2f}₽

@@ -9,9 +9,9 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-    # Telegram
     BOT_TOKEN: str
     ADMIN_IDS: str
+    SUPPORT_USERNAME: str = "admin"
 
     # Database
     DATABASE_URL: str
