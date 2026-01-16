@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.filters import CommandStart, Command
+from aiogram.filters import CommandStart, Command, CommandObject
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,8 +12,15 @@ router = Router()
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message):
+async def cmd_start(message: Message, command: CommandObject):
     """Обработчик команды /start"""
+    referrer_id = None
+    args = command.args
+    if args and args.isdigit():
+        referrer_id = int(args)
+        if referrer_id == message.from_user.id:
+            referrer_id = None  # Нельзя пригласить самого себя
+
     async with AsyncSessionLocal() as session:
         # Создаём или обновляем пользователя
         user = await UserService.get_or_create_user(
@@ -22,6 +29,7 @@ async def cmd_start(message: Message):
             username=message.from_user.username,
             first_name=message.from_user.first_name,
             last_name=message.from_user.last_name,
+            referrer_id=referrer_id,
         )
 
         # Проверяем, является ли пользователь админом

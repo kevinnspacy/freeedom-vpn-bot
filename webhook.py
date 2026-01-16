@@ -7,6 +7,7 @@ from loguru import logger
 from database.database import AsyncSessionLocal
 from services.payment_service import PaymentService
 from services.subscription_service import SubscriptionService
+from services.user_service import UserService
 from config import settings
 
 app = FastAPI(title="Shadowsocks VPN Bot - Webhook Server")
@@ -52,6 +53,11 @@ async def yukassa_webhook(request: Request):
                     await subscription_service.create_subscription(
                         session, telegram_id, plan_type
                     )
+
+                # Начисляем реферальный бонус
+                amount_value = payment_object.get("amount", {}).get("value")
+                if amount_value:
+                    await UserService.accrue_referral_bonus(session, telegram_id, float(amount_value))
 
             await session.commit()
 

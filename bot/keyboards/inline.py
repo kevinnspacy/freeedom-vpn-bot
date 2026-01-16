@@ -52,6 +52,23 @@ def payment_keyboard(payment_url: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def payment_method_keyboard(plan_type: str, price: int, balance: float) -> InlineKeyboardMarkup:
+    """Клавиатура выбора метода оплаты"""
+    builder = InlineKeyboardBuilder()
+
+    builder.row(
+        InlineKeyboardButton(text=f"💰 С баланса ({price}₽)", callback_data=f"pay_balance_{plan_type}")
+    )
+    builder.row(
+        InlineKeyboardButton(text="💳 Картой / SberPay", callback_data=f"pay_card_{plan_type}")
+    )
+    builder.row(
+        InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_menu")
+    )
+
+    return builder.as_markup()
+
+
 def connection_guide_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура с инструкциями"""
     builder = InlineKeyboardBuilder()

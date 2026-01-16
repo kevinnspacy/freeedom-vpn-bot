@@ -5,8 +5,9 @@ from aiogram.fsm.context import FSMContext
 from database.database import AsyncSessionLocal
 from services.payment_service import PaymentService
 from services.subscription_service import SubscriptionService
+from services.user_service import UserService
 from services.marzban_service import marzban_service
-from bot.keyboards.inline import payment_keyboard, subscription_plans_keyboard
+from bot.keyboards.inline import payment_keyboard, subscription_plans_keyboard, payment_method_keyboard
 from loguru import logger
 
 router = Router()
@@ -141,7 +142,7 @@ async def process_trial_subscription(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("buy_"))
 async def process_buy_subscription(callback: CallbackQuery, state: FSMContext):
-    """Обработка покупки подписки"""
+    """Обработка выбора тарифа"""
     plan_type = callback.data.split("_")[1]  # day, week, month, year, trial
 
     # Если это trial, перенаправляем на специальный обработчик
@@ -154,13 +155,80 @@ async def process_buy_subscription(callback: CallbackQuery, state: FSMContext):
             session, callback.from_user.id
         )
 
+        text_prefix = ""
         if existing_subscription:
-            await callback.message.edit_text(
-                "⚠️ У вас уже есть активная подписка!\n\n"
-                "Новая подписка будет добавлена к текущей.",
-            )
+            text_prefix = "⚠️ У вас уже есть активная подписка!\nНовая подписка будет добавлена к текущей.\n\n"
 
-    # Создаём платёж
+        # Проверяем баланс пользователя
+        user = await UserService.get_user_by_telegram_id(session, callback.from_user.id)
+        amount = payment_service.get_price(plan_type)
+        
+        if user and user.balance >= amount:
+            await callback.message.edit_text(
+                f"{text_prefix}"
+                f"💳 Тариф: {payment_service.get_plan_name(plan_type)}\n"
+                f"💰 Стоимость: {amount}₽\n"
+                f"🏦 Ваш баланс: {user.balance:.0f}₽\n\n"
+                "Выберите способ оплаты:",
+                reply_markup=payment_method_keyboard(plan_type, amount, user.balance)
+            )
+            await callback.answer()
+            return
+
+    # Если баланса недостаточно или пользователя нет, переходим к оплате картой
+    await process_card_payment_logic(callback, state, plan_type)
+
+
+@router.callback_query(F.data.startswith("pay_card_"))
+async def process_card_payment_handler(callback: CallbackQuery, state: FSMContext):
+    """Обработка нажатия 'Оплатить картой'"""
+    plan_type = callback.data.split("_")[2] # pay_card_day
+    await process_card_payment_logic(callback, state, plan_type)
+
+
+@router.callback_query(F.data.startswith("pay_balance_"))
+async def process_balance_payment(callback: CallbackQuery):
+    """Обработка оплаты с баланса"""
+    plan_type = callback.data.split("_")[2] # pay_balance_day
+    amount = payment_service.get_price(plan_type)
+    
+    async with AsyncSessionLocal() as session:
+        user = await UserService.get_user_by_telegram_id(session, callback.from_user.id)
+        
+        if not user or user.balance < amount:
+            await callback.answer("❌ Недостаточно средств на балансе", show_alert=True)
+            return
+
+        # Списываем баланс
+        user.balance -= amount
+        
+        # Создаем или продлеваем подписку
+        existing_subscription = await subscription_service.get_active_subscription(
+            session, callback.from_user.id
+        )
+        
+        if existing_subscription:
+            subscription = await subscription_service.extend_subscription(
+                session, existing_subscription, plan_type
+            )
+        else:
+            subscription = await subscription_service.create_subscription(
+                session, callback.from_user.id, plan_type
+            )
+            
+        # Начисляем реферальный бонус пригласившему (даже при оплате с баланса? Да, почему нет, если деньги реальные были)
+        # Хотя стоп, баланс уже бонусный. Начислять бонусы с бонусов? Это инфляция.
+        # Обычно с бонусных оплат реферальные НЕ начисляются. 
+        # Давайте НЕ начислять реф. бонус при оплате с баланса.
+        
+        await session.commit()
+        
+        await send_connection_info(callback, subscription, is_trial=False)
+        await callback.answer("✅ Оплата прошла успешно!")
+
+
+async def process_card_payment_logic(callback: CallbackQuery, state: FSMContext, plan_type: str):
+    """Логика создания платежа YooKassa"""
     async with AsyncSessionLocal() as session:
         try:
             payment = await payment_service.create_payment(
@@ -197,7 +265,7 @@ async def process_buy_subscription(callback: CallbackQuery, state: FSMContext):
                 "❌ Ошибка при создании платежа. Попробуйте позже.",
                 reply_markup=subscription_plans_keyboard()
             )
-
+    
     await callback.answer()
 
 
@@ -241,6 +309,10 @@ async def check_payment_status(callback: CallbackQuery, state: FSMContext):
                         telegram_id=callback.from_user.id,
                         plan_type=payment.plan_type,
                     )
+
+                # Начисляем реферальный бонус
+                if payment.amount:
+                    await UserService.accrue_referral_bonus(session, callback.from_user.id, payment.amount)
 
                 await session.commit()
 

@@ -7,7 +7,7 @@ from loguru import logger
 
 from config import settings
 from database.database import init_db
-from bot.handlers import start, subscription, payment, admin
+from bot.handlers import start, subscription, payment, admin, referral
 
 # Настройка логирования
 logger.add(
@@ -39,6 +39,7 @@ async def main():
     dp.include_router(subscription.router)
     dp.include_router(payment.router)
     dp.include_router(admin.router)
+    dp.include_router(referral.router)
 
     logger.info("Starting bot...")
 

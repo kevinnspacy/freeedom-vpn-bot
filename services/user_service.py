@@ -14,6 +14,7 @@ class UserService:
         username: str | None = None,
         first_name: str | None = None,
         last_name: str | None = None,
+        referrer_id: int | None = None,
     ) -> User:
         """Получить или создать пользователя"""
         result = await session.execute(
@@ -27,10 +28,11 @@ class UserService:
                 username=username,
                 first_name=first_name,
                 last_name=last_name,
+                referrer_id=referrer_id,
             )
             session.add(user)
             await session.flush()
-            logger.info(f"New user created: {telegram_id} (@{username})")
+            logger.info(f"New user created: {telegram_id} (@{username}), referrer: {referrer_id}")
         else:
             # Обновляем данные пользователя
             user.username = username
@@ -54,3 +56,25 @@ class UserService:
         """Проверить, является ли пользователь администратором"""
         user = await UserService.get_user_by_telegram_id(session, telegram_id)
         return user.is_admin if user else False
+
+    @staticmethod
+    async def accrue_referral_bonus(session: AsyncSession, user_id: int, amount: float):
+        """Начислить реферальный бонус пригласившему"""
+        from config import settings
+        
+        user = await UserService.get_user_by_telegram_id(session, user_id)
+        if not user or not user.referrer_id:
+            return
+
+        referrer = await UserService.get_user_by_telegram_id(session, user.referrer_id)
+        if not referrer:
+            return
+
+        bonus = amount * settings.REFERRAL_PERCENT
+        referrer.balance += bonus
+        session.add(referrer)
+        
+        logger.info(f"Referral bonus {bonus} accrued to {referrer.telegram_id} for user {user_id}")
+        
+        # Можно отправить уведомление рефереру, но нужен bot экземпляр
+        # Это лучше делать в handler слое

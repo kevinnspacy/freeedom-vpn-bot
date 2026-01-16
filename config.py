@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     PRICE_3MONTH: int = 399
     PRICE_YEAR: int = 1499
 
+    # Referral
+    REFERRAL_PERCENT: float = 0.15  # 15% bonus
+
     # Server
     SERVER_LOCATION: str = "Netherlands"
 
