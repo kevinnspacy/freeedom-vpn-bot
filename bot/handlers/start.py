@@ -44,24 +44,27 @@ async def cmd_start(message: Message, command: CommandObject):
     # Выбираем клавиатуру
     keyboard = admin_menu_keyboard() if is_admin else main_menu_keyboard()
 
+    import html
+    safe_first_name = html.escape(message.from_user.first_name)
+    
     welcome_text = f"""
-👋 Привет, {message.from_user.first_name}!
+👋 Привет, {safe_first_name}!
 
-🚀 **FreedomVPN** — твой свободный интернет без границ.
-Протокол **VLESS + Reality** невозможно заблокировать!
+🚀 <b>FreedomVPN</b> — твой свободный интернет без границ.
+Протокол <b>VLESS + Reality</b> невозможно заблокировать!
 
-⚡️ **YouTube 4K** без тормозов и буферизации
-🛡 **Полная анонимность** и шифрование
-🌍 **Доступ** к Instagram, Netflix, ChatGPT
-📱 Работает на **iPhone, Android, PC и Mac**
+⚡️ <b>YouTube 4K</b> без тормозов и буферизации
+🛡 <b>Полная анонимность</b> и шифрование
+🌍 <b>Доступ</b> к Instagram, Netflix, ChatGPT
+📱 Работает на <b>iPhone, Android, PC и Mac</b>
 
-🎁 **ПОПРОБУЙ БЕСПЛАТНО (24 часа)**
+🎁 <b>ПОПРОБУЙ БЕСПЛАТНО (24 часа)</b>
 Жми "💰 Купить подписку" ➡️ "Попробовать БЕСПЛАТНО"
 
 👇 Начни прямо сейчас!
 """
 
-    await message.answer(welcome_text, reply_markup=keyboard)
+    await message.answer(welcome_text, reply_markup=keyboard, parse_mode="HTML")
 
 
 @router.message(Command("myid"))
