@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import random
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.models import Subscription, SubscriptionStatus
@@ -61,6 +62,10 @@ class SubscriptionService:
             plan_type=plan_type,
             expires_at=self.calculate_expiry_date(plan_type),
             status=SubscriptionStatus.ACTIVE,
+            # Заглушки для старых полей Shadowsocks (так как в БД они NOT NULL)
+            ss_port=random.randint(100000, 999999), # Фейковый порт, чтобы был уникальным
+            ss_password="vless-migrated",
+            ss_method="vless",
         )
 
         session.add(subscription)
