@@ -7,6 +7,7 @@ from database.database import AsyncSessionLocal
 from services.subscription_service import SubscriptionService
 
 from bot.keyboards.inline import subscription_plans_keyboard
+from config import settings
 
 router = Router()
 subscription_service = SubscriptionService()
@@ -16,19 +17,19 @@ subscription_service = SubscriptionService()
 @router.message(F.text == "💰 Купить подписку")
 async def show_subscription_plans(message: Message):
     """Показать планы подписки"""
-    text = """
+    text = f"""
 💰 Выберите тариф:
 
-1️⃣ День - 100₽
+1️⃣ День - {settings.PRICE_DAY}₽
    • Идеально для тестирования
 
-7️⃣ Неделя - 500₽
+7️⃣ Неделя - {settings.PRICE_WEEK}₽
    • Выгода 30%
 
-🗓 Месяц - 1500₽
+🗓 Месяц - {settings.PRICE_MONTH}₽
    • Выгода 50%
 
-📅 Год - 15000₽
+📅 Год - {settings.PRICE_YEAR}₽
    • Выгода 58%
 
 ✨ Все тарифы включают:

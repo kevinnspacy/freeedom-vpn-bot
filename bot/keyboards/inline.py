@@ -1,5 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from config import settings
 
 
 def subscription_plans_keyboard(show_trial: bool = True) -> InlineKeyboardMarkup:
@@ -13,19 +14,19 @@ def subscription_plans_keyboard(show_trial: bool = True) -> InlineKeyboardMarkup
         )
 
     builder.row(
-        InlineKeyboardButton(text="1️⃣ День - 9₽", callback_data="buy_day")
+        InlineKeyboardButton(text=f"1️⃣ День - {settings.PRICE_DAY}₽", callback_data="buy_day")
     )
     builder.row(
-        InlineKeyboardButton(text="7️⃣ Неделя - 49₽", callback_data="buy_week")
+        InlineKeyboardButton(text=f"7️⃣ Неделя - {settings.PRICE_WEEK}₽", callback_data="buy_week")
     )
     builder.row(
-        InlineKeyboardButton(text="🗓 Месяц - 149₽", callback_data="buy_month")
+        InlineKeyboardButton(text=f"🗓 Месяц - {settings.PRICE_MONTH}₽", callback_data="buy_month")
     )
     builder.row(
-        InlineKeyboardButton(text="📆 3 месяца - 399₽", callback_data="buy_3month")
+        InlineKeyboardButton(text=f"📆 3 месяца - {settings.PRICE_3MONTH}₽", callback_data="buy_3month")
     )
     builder.row(
-        InlineKeyboardButton(text="📅 Год - 1499₽", callback_data="buy_year")
+        InlineKeyboardButton(text=f"📅 Год - {settings.PRICE_YEAR}₽", callback_data="buy_year")
     )
     builder.row(
         InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_menu")
