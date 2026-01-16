@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     BOT_TOKEN: str
     ADMIN_IDS: str
-    SUPPORT_USERNAME: str = "admin"
+    SUPPORT_USERNAME: str = "thaifre"
 
     # Database
     DATABASE_URL: str
