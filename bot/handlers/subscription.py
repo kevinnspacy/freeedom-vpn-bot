@@ -80,13 +80,6 @@ async def show_status(message: Message):
 ⏳ Осталось: {days_left} дней {hours_left} часов
 📆 Истекает: {subscription.expires_at.strftime('%d.%m.%Y %H:%M')}
 
-"""
-✅ Ваша подписка активна!
-
-📅 Тариф: {subscription.plan_type}
-⏳ Осталось: {days_left} дней {hours_left} часов
-📆 Истекает: {subscription.expires_at.strftime('%d.%m.%Y %H:%M')}
-
 🔐 **Подключение VLESS + Reality**
 
 🔗 **Прямая ссылка (нажмите чтобы скопировать):**
