@@ -2,27 +2,28 @@ from datetime import datetime, timedelta
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.models import Subscription, SubscriptionStatus
-from services.shadowsocks_service import ShadowsocksService
+from services.marzban_service import marzban_service
 from loguru import logger
 
 
 class SubscriptionService:
-    """Сервис для работы с подписками"""
-
-    def __init__(self):
-        self.ss_service = ShadowsocksService()
+    """Сервис для работы с подписками (VLESS + Reality через Marzban)"""
 
     @staticmethod
     def calculate_expiry_date(plan_type: str) -> datetime:
         """Рассчитать дату истечения подписки"""
         now = datetime.utcnow()
 
-        if plan_type == "day":
+        if plan_type == "trial":
+            return now + timedelta(hours=24)
+        elif plan_type == "day":
             return now + timedelta(days=1)
         elif plan_type == "week":
             return now + timedelta(weeks=1)
         elif plan_type == "month":
             return now + timedelta(days=30)
+        elif plan_type == "3month":
+            return now + timedelta(days=90)
         elif plan_type == "year":
             return now + timedelta(days=365)
         else:
@@ -34,25 +35,29 @@ class SubscriptionService:
         telegram_id: int,
         plan_type: str,
     ) -> Subscription:
-        """Создать новую подписку"""
+        """Создать новую подписку через Marzban (VLESS + Reality)"""
 
-        # Генерируем учётные данные
-        port = self.ss_service.generate_port()
-        password = self.ss_service.generate_password()
-
-        # Создаём пользователя на Shadowsocks сервере
+        # Создаём пользователя в Marzban
         try:
-            await self.ss_service.create_user(port, password)
+            marzban_user = await marzban_service.create_user(
+                telegram_id=telegram_id,
+                plan_type=plan_type
+            )
+            marzban_username = marzban_user.get("username")
+            subscription_url = marzban_user.get("subscription_url", "")
+
+            logger.info(f"Marzban user created: {marzban_username} for telegram_id={telegram_id}")
+
         except Exception as e:
-            logger.error(f"Failed to create Shadowsocks user for {telegram_id}: {e}")
+            logger.error(f"Failed to create Marzban user for {telegram_id}: {e}")
             raise
 
         # Создаём подписку в БД
         subscription = Subscription(
             telegram_id=telegram_id,
             user_id=telegram_id,
-            ss_port=port,
-            ss_password=password,
+            marzban_username=marzban_username,
+            subscription_url=subscription_url,
             plan_type=plan_type,
             expires_at=self.calculate_expiry_date(plan_type),
             status=SubscriptionStatus.ACTIVE,
@@ -81,6 +86,21 @@ class SubscriptionService:
         )
         return result.scalar_one_or_none()
 
+    async def has_used_trial(
+        self, session: AsyncSession, telegram_id: int
+    ) -> bool:
+        """Проверить, использовал ли пользователь тестовый период"""
+        result = await session.execute(
+            select(Subscription)
+            .where(
+                and_(
+                    Subscription.telegram_id == telegram_id,
+                    Subscription.plan_type == "trial"
+                )
+            )
+        )
+        return result.scalar_one_or_none() is not None
+
     async def extend_subscription(
         self,
         session: AsyncSession,
@@ -89,13 +109,23 @@ class SubscriptionService:
     ) -> Subscription:
         """Продлить существующую подписку"""
 
-        # Если подписка истекла, обновляем дату начала
+        # Продлеваем в Marzban
+        if subscription.marzban_username:
+            try:
+                await marzban_service.extend_user(subscription.marzban_username, plan_type)
+            except Exception as e:
+                logger.error(f"Failed to extend Marzban user: {e}")
+                raise
+
+        # Обновляем дату в БД
         if subscription.expires_at < datetime.utcnow():
             subscription.started_at = datetime.utcnow()
             subscription.expires_at = self.calculate_expiry_date(plan_type)
         else:
-            # Иначе добавляем время к текущей дате истечения
-            if plan_type == "day":
+            # Добавляем время к текущей дате истечения
+            if plan_type == "trial":
+                subscription.expires_at += timedelta(hours=24)
+            elif plan_type == "day":
                 subscription.expires_at += timedelta(days=1)
             elif plan_type == "week":
                 subscription.expires_at += timedelta(weeks=1)
@@ -115,11 +145,12 @@ class SubscriptionService:
     ) -> bool:
         """Отменить подписку"""
 
-        # Удаляем пользователя с Shadowsocks сервера
-        try:
-            await self.ss_service.delete_user(subscription.ss_port)
-        except Exception as e:
-            logger.error(f"Failed to delete Shadowsocks user: {e}")
+        # Удаляем пользователя из Marzban
+        if subscription.marzban_username:
+            try:
+                await marzban_service.delete_user(subscription.marzban_username)
+            except Exception as e:
+                logger.error(f"Failed to delete Marzban user: {e}")
 
         # Обновляем статус в БД
         subscription.status = SubscriptionStatus.CANCELLED
@@ -127,6 +158,23 @@ class SubscriptionService:
 
         logger.info(f"Subscription cancelled for user {subscription.telegram_id}")
         return True
+
+    async def get_connection_info(self, subscription: Subscription) -> dict:
+        """Получить информацию для подключения"""
+        if not subscription.marzban_username:
+            return {"error": "No Marzban username found"}
+
+        try:
+            user_links = await marzban_service.get_user_links(subscription.marzban_username)
+            return {
+                "subscription_url": user_links.get("subscription_url", ""),
+                "links": user_links.get("links", []),
+                "expires_at": subscription.expires_at,
+                "status": subscription.status
+            }
+        except Exception as e:
+            logger.error(f"Failed to get connection info: {e}")
+            return {"error": str(e)}
 
     async def check_expired_subscriptions(self, session: AsyncSession):
         """Проверить и деактивировать истекшие подписки"""

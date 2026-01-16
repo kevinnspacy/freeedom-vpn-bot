@@ -20,20 +20,30 @@ class Settings(BaseSettings):
     YUKASSA_SHOP_ID: str
     YUKASSA_SECRET_KEY: str
 
-    # Shadowsocks
-    SS_SERVER_HOST: str
+    # Marzban (VLESS + Reality)
+    MARZBAN_API_URL: str = "http://localhost:8000"
+    MARZBAN_USERNAME: str = "admin"
+    MARZBAN_PASSWORD: str = "admin"
+
+    # VPN Server
+    VPN_SERVER_HOST: str = "107.189.23.38"
+
+    # Legacy Shadowsocks (deprecated, kept for compatibility)
+    SS_SERVER_HOST: str = "107.189.23.38"
     SS_SERVER_PORT: int = 8388
     SS_METHOD: str = "chacha20-ietf-poly1305"
-    SS_API_URL: str
+    SS_API_URL: str = ""
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # Pricing
-    PRICE_DAY: int = 100
-    PRICE_WEEK: int = 500
-    PRICE_MONTH: int = 1500
-    PRICE_YEAR: int = 15000
+    PRICE_TRIAL: int = 0  # Бесплатный тестовый период 24 часа
+    PRICE_DAY: int = 9
+    PRICE_WEEK: int = 49
+    PRICE_MONTH: int = 149
+    PRICE_3MONTH: int = 399
+    PRICE_YEAR: int = 1499
 
     # Server
     SERVER_LOCATION: str = "Netherlands"

@@ -1,5 +1,6 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
+from aiogram.exceptions import TelegramBadRequest
 from sqlalchemy import select, func
 from datetime import datetime
 
@@ -86,7 +87,10 @@ async def show_admin_stats(callback: CallbackQuery):
 💸 Общая выручка: {total_revenue:.2f}₽
 """
 
-    await callback.message.edit_text(stats_text, reply_markup=admin_panel_keyboard())
+    try:
+        await callback.message.edit_text(stats_text, reply_markup=admin_panel_keyboard())
+    except TelegramBadRequest:
+        pass
     await callback.answer()
 
 
@@ -105,10 +109,13 @@ async def show_admin_users(callback: CallbackQuery):
         users = result.scalars().all()
 
         if not users:
-            await callback.message.edit_text(
-                "👥 Пользователи не найдены",
-                reply_markup=admin_panel_keyboard()
-            )
+            try:
+                await callback.message.edit_text(
+                    "👥 Пользователи не найдены",
+                    reply_markup=admin_panel_keyboard()
+                )
+            except TelegramBadRequest:
+                pass
             return
 
         users_text = "👥 Последние 10 пользователей:\n\n"
@@ -121,7 +128,10 @@ async def show_admin_users(callback: CallbackQuery):
                 f"Регистрация: {user.created_at.strftime('%d.%m.%Y')}\n\n"
             )
 
-    await callback.message.edit_text(users_text, reply_markup=admin_panel_keyboard())
+    try:
+        await callback.message.edit_text(users_text, reply_markup=admin_panel_keyboard())
+    except TelegramBadRequest:
+        pass  # Сообщение не изменилось
     await callback.answer()
 
 
@@ -140,10 +150,13 @@ async def show_admin_payments(callback: CallbackQuery):
         payments = result.scalars().all()
 
         if not payments:
-            await callback.message.edit_text(
-                "💰 Платежи не найдены",
-                reply_markup=admin_panel_keyboard()
-            )
+            try:
+                await callback.message.edit_text(
+                    "💰 Платежи не найдены",
+                    reply_markup=admin_panel_keyboard()
+                )
+            except TelegramBadRequest:
+                pass
             return
 
         payments_text = "💰 Последние 10 платежей:\n\n"
@@ -156,5 +169,8 @@ async def show_admin_payments(callback: CallbackQuery):
                 f"Статус: {payment.status}\n\n"
             )
 
-    await callback.message.edit_text(payments_text, reply_markup=admin_panel_keyboard())
+    try:
+        await callback.message.edit_text(payments_text, reply_markup=admin_panel_keyboard())
+    except TelegramBadRequest:
+        pass
     await callback.answer()

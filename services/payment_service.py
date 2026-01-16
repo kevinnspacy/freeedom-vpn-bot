@@ -16,17 +16,32 @@ class PaymentService:
     """Сервис для работы с платежами через ЮKassa"""
 
     PLAN_PRICES = {
+        "trial": settings.PRICE_TRIAL,
         "day": settings.PRICE_DAY,
         "week": settings.PRICE_WEEK,
         "month": settings.PRICE_MONTH,
+        "3month": settings.PRICE_3MONTH,
         "year": settings.PRICE_YEAR,
     }
 
+    # Внутренние названия (для бота)
     PLAN_NAMES = {
+        "trial": "Тестовый период (24 часа)",
         "day": "1 день",
         "week": "1 неделя",
         "month": "1 месяц",
+        "3month": "3 месяца",
         "year": "1 год",
+    }
+
+    # Названия для ЮKassa (маскировка под автотехпомощь)
+    PLAN_DESCRIPTIONS = {
+        "trial": "Консультация по техпомощи",
+        "day": "Разовый выезд автотехпомощи",
+        "week": "Недельный абонемент автотехпомощи",
+        "month": "Месячный абонемент автотехпомощи",
+        "3month": "Квартальный абонемент автотехпомощи",
+        "year": "Годовой абонемент автотехпомощи",
     }
 
     @classmethod
@@ -39,6 +54,11 @@ class PaymentService:
         """Получить название плана"""
         return cls.PLAN_NAMES.get(plan_type, plan_type)
 
+    @classmethod
+    def get_plan_description(cls, plan_type: str) -> str:
+        """Получить описание для ЮKassa (маскировка)"""
+        return cls.PLAN_DESCRIPTIONS.get(plan_type, "Услуги автотехпомощи")
+
     async def create_payment(
         self,
         session: AsyncSession,
@@ -49,7 +69,7 @@ class PaymentService:
         """Создать платёж через ЮKassa"""
 
         amount = self.get_price(plan_type)
-        description = f"Подписка Shadowsocks VPN: {self.get_plan_name(plan_type)}"
+        description = self.get_plan_description(plan_type)
 
         # Генерируем уникальный idempotence_key
         idempotence_key = str(uuid.uuid4())
@@ -63,7 +83,7 @@ class PaymentService:
                 },
                 "confirmation": {
                     "type": "redirect",
-                    "return_url": return_url or "https://t.me/your_bot_username"
+                    "return_url": return_url or "https://t.me/freeddomm_bot"
                 },
                 "capture": True,
                 "description": description,

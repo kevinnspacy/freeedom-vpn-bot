@@ -5,6 +5,7 @@ from aiogram.fsm.context import FSMContext
 from database.database import AsyncSessionLocal
 from services.payment_service import PaymentService
 from services.subscription_service import SubscriptionService
+from services.marzban_service import marzban_service
 from bot.keyboards.inline import payment_keyboard, subscription_plans_keyboard
 from loguru import logger
 
@@ -13,10 +14,142 @@ payment_service = PaymentService()
 subscription_service = SubscriptionService()
 
 
+async def send_connection_info(callback: CallbackQuery, subscription, is_trial: bool = False):
+    """Отправить информацию о подключении пользователю"""
+    # Получаем ссылки из Marzban
+    try:
+        connection_info = await subscription_service.get_connection_info(subscription)
+
+        if "error" in connection_info:
+            raise Exception(connection_info["error"])
+
+        subscription_url = connection_info.get("subscription_url", "")
+        links = connection_info.get("links", [])
+
+        # Берём первую VLESS ссылку
+        vless_link = ""
+        for link in links:
+            if link.startswith("vless://"):
+                vless_link = link
+                break
+
+        title = "🎁 Тестовый период активирован!" if is_trial else "✅ Оплата прошла успешно!"
+        subtitle = "Ваша подписка на 24 часа активна!" if is_trial else "Ваша подписка активирована!"
+
+        success_text = f"""
+{title}
+
+{subtitle}
+
+🔐 **Подключение VLESS + Reality**
+
+📱 **Ссылка подписки** (обновляется автоматически):
+`{subscription_url}`
+
+🔗 **Прямая ссылка для подключения:**
+`{vless_link[:80]}...`
+
+📆 **Действует до:** {subscription.expires_at.strftime('%d.%m.%Y %H:%M')} МСК
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+📲 **Как подключиться:**
+
+**Android:** v2rayNG
+**iOS:** Streisand, Shadowrocket
+**Windows:** v2rayN, Nekoray
+**macOS:** V2rayU, Nekoray
+
+1. Скопируйте ссылку подписки
+2. Откройте приложение
+3. Импортируйте конфигурацию из буфера
+4. Подключитесь!
+
+🔗 QR-код отправлен следующим сообщением.
+"""
+
+        await callback.message.edit_text(success_text, parse_mode="Markdown")
+
+        # Отправляем QR-код с ссылкой подписки
+        qr_url = marzban_service.generate_qr_code_url(subscription_url)
+        await callback.message.answer_photo(
+            photo=qr_url,
+            caption="📱 Отсканируйте QR-код в приложении v2rayNG/Streisand"
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to get connection info: {e}")
+        await callback.message.edit_text(
+            f"✅ Подписка активирована!\n\n"
+            f"⚠️ Не удалось получить ссылку для подключения.\n"
+            f"Попробуйте команду /status для получения данных."
+        )
+
+
+@router.callback_query(F.data == "buy_trial")
+async def process_trial_subscription(callback: CallbackQuery):
+    """Обработка бесплатного тестового периода"""
+    async with AsyncSessionLocal() as session:
+        # Проверяем, не использовал ли пользователь уже тестовый период
+        trial_used = await subscription_service.has_used_trial(
+            session, callback.from_user.id
+        )
+
+        if trial_used:
+            await callback.message.edit_text(
+                "❌ Вы уже использовали тестовый период.\n\n"
+                "Выберите один из платных тарифов:",
+                reply_markup=subscription_plans_keyboard(show_trial=False)
+            )
+            await callback.answer()
+            return
+
+        # Проверяем активную подписку
+        existing_subscription = await subscription_service.get_active_subscription(
+            session, callback.from_user.id
+        )
+
+        if existing_subscription:
+            await callback.message.edit_text(
+                "⚠️ У вас уже есть активная подписка!\n\n"
+                "Тестовый период доступен только новым пользователям.",
+                reply_markup=subscription_plans_keyboard(show_trial=False)
+            )
+            await callback.answer()
+            return
+
+        try:
+            # Создаём тестовую подписку на 24 часа
+            subscription = await subscription_service.create_subscription(
+                session,
+                telegram_id=callback.from_user.id,
+                plan_type="trial",
+            )
+            await session.commit()
+
+            # Отправляем информацию о подключении
+            await send_connection_info(callback, subscription, is_trial=True)
+
+            logger.info(f"Trial subscription created for user {callback.from_user.id}")
+
+        except Exception as e:
+            logger.error(f"Failed to create trial subscription: {e}")
+            await callback.message.edit_text(
+                "❌ Ошибка при создании тестовой подписки. Попробуйте позже.",
+                reply_markup=subscription_plans_keyboard()
+            )
+
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("buy_"))
 async def process_buy_subscription(callback: CallbackQuery, state: FSMContext):
     """Обработка покупки подписки"""
-    plan_type = callback.data.split("_")[1]  # day, week, month, year
+    plan_type = callback.data.split("_")[1]  # day, week, month, year, trial
+
+    # Если это trial, перенаправляем на специальный обработчик
+    if plan_type == "trial":
+        return await process_trial_subscription(callback)
 
     # Проверяем, есть ли уже активная подписка
     async with AsyncSessionLocal() as session:
@@ -114,40 +247,8 @@ async def check_payment_status(callback: CallbackQuery, state: FSMContext):
 
                 await session.commit()
 
-                # Генерируем данные для подключения
-                from services.shadowsocks_service import ShadowsocksService
-                ss_service = ShadowsocksService()
-
-                connection_string = ss_service.generate_connection_string(
-                    subscription.ss_password, subscription.ss_port
-                )
-                qr_url = ss_service.generate_qr_code_url(connection_string)
-
-                success_text = f"""
-✅ Оплата прошла успешно!
-
-Ваша подписка активирована!
-
-🔐 Данные для подключения:
-
-Сервер: {ss_service.server_host}
-Порт: {subscription.ss_port}
-Пароль: `{subscription.ss_password}`
-Метод: {subscription.ss_method}
-
-📱 Строка подключения:
-`{connection_string}`
-
-📆 Действует до: {subscription.expires_at.strftime('%d.%m.%Y %H:%M')}
-
-🔗 QR-код отправлен в следующем сообщении.
-"""
-
-                await callback.message.edit_text(success_text, parse_mode="Markdown")
-                await callback.message.answer_photo(
-                    photo=qr_url,
-                    caption="📱 Отсканируйте QR-код в приложении Shadowsocks"
-                )
+                # Отправляем информацию о подключении
+                await send_connection_info(callback, subscription, is_trial=False)
 
                 # Очищаем состояние
                 await state.clear()

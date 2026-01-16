@@ -1,8 +1,9 @@
 import secrets
 import string
-import httpx
+import base64
 from loguru import logger
 from config import settings
+from shadowsocks_api import ss_manager, get_available_port
 
 
 class ShadowsocksService:
@@ -10,10 +11,7 @@ class ShadowsocksService:
 
     def __init__(self):
         self.server_host = settings.SS_SERVER_HOST
-        self.server_port = settings.SS_SERVER_PORT
         self.method = settings.SS_METHOD
-        self.api_url = settings.SS_API_URL
-        self.used_ports = set()
 
     @staticmethod
     def generate_password(length: int = 16) -> str:
@@ -21,39 +19,26 @@ class ShadowsocksService:
         alphabet = string.ascii_letters + string.digits
         return ''.join(secrets.choice(alphabet) for _ in range(length))
 
-    def generate_port(self, start: int = 10000, end: int = 60000) -> int:
-        """Генерация свободного порта"""
-        while True:
-            port = secrets.randbelow(end - start) + start
-            if port not in self.used_ports:
-                self.used_ports.add(port)
-                return port
-
     async def create_user(self, user_port: int, password: str) -> dict:
         """
-        Создание пользователя на Shadowsocks сервере
-
-        Для Outline VPN (управление через API):
-        POST /access-keys
-        {
-            "method": "chacha20-ietf-poly1305",
-            "password": "password",
-            "port": 10000
-        }
+        Создание пользователя на Shadowsocks сервере через ss-manager
         """
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{self.api_url}/access-keys",
-                    json={
-                        "method": self.method,
-                        "password": password,
-                        "port": user_port,
-                    }
-                )
-                response.raise_for_status()
-                logger.info(f"Shadowsocks user created: port={user_port}")
-                return response.json()
+            # Добавляем порт в ss-manager
+            success = await ss_manager.add_port(user_port, password)
+
+            if not success:
+                raise Exception(f"Failed to add port {user_port} to ss-manager")
+
+            logger.info(f"Shadowsocks user created: port={user_port}")
+
+            # Возвращаем данные для подключения
+            return {
+                "port": user_port,
+                "password": password,
+                "method": self.method,
+                "server": self.server_host
+            }
         except Exception as e:
             logger.error(f"Failed to create Shadowsocks user: {e}")
             raise
@@ -61,21 +46,23 @@ class ShadowsocksService:
     async def delete_user(self, user_port: int) -> bool:
         """
         Удаление пользователя с Shadowsocks сервера
-
-        DELETE /access-keys/{port}
         """
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.delete(
-                    f"{self.api_url}/access-keys/{user_port}"
-                )
-                response.raise_for_status()
+            success = await ss_manager.remove_port(user_port)
+
+            if success:
                 logger.info(f"Shadowsocks user deleted: port={user_port}")
-                self.used_ports.discard(user_port)
-                return True
+            else:
+                logger.error(f"Failed to delete port {user_port}")
+
+            return success
         except Exception as e:
             logger.error(f"Failed to delete Shadowsocks user: {e}")
             return False
+
+    async def get_available_port(self) -> int:
+        """Получить свободный порт"""
+        return await get_available_port()
 
     def generate_connection_string(self, password: str, port: int) -> str:
         """

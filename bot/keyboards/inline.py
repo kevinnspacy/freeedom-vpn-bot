@@ -2,21 +2,30 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
-def subscription_plans_keyboard() -> InlineKeyboardMarkup:
+def subscription_plans_keyboard(show_trial: bool = True) -> InlineKeyboardMarkup:
     """Клавиатура с планами подписки"""
     builder = InlineKeyboardBuilder()
 
+    # Тестовый период (только для новых пользователей)
+    if show_trial:
+        builder.row(
+            InlineKeyboardButton(text="🎁 Попробовать БЕСПЛАТНО (24 часа)", callback_data="buy_trial")
+        )
+
     builder.row(
-        InlineKeyboardButton(text="1️⃣ День - 100₽", callback_data="buy_day")
+        InlineKeyboardButton(text="1️⃣ День - 9₽", callback_data="buy_day")
     )
     builder.row(
-        InlineKeyboardButton(text="7️⃣ Неделя - 500₽", callback_data="buy_week")
+        InlineKeyboardButton(text="7️⃣ Неделя - 49₽", callback_data="buy_week")
     )
     builder.row(
-        InlineKeyboardButton(text="🗓 Месяц - 1500₽", callback_data="buy_month")
+        InlineKeyboardButton(text="🗓 Месяц - 149₽", callback_data="buy_month")
     )
     builder.row(
-        InlineKeyboardButton(text="📅 Год - 15000₽", callback_data="buy_year")
+        InlineKeyboardButton(text="📆 3 месяца - 399₽", callback_data="buy_3month")
+    )
+    builder.row(
+        InlineKeyboardButton(text="📅 Год - 1499₽", callback_data="buy_year")
     )
     builder.row(
         InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_menu")

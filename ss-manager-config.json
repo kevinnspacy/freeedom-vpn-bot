@@ -1,0 +1,9 @@
+{
+    "server": "0.0.0.0",
+    "method": "chacha20-ietf-poly1305",
+    "timeout": 300,
+    "fast_open": true,
+    "reuse_port": true,
+    "no_delay": true,
+    "manager_address": "127.0.0.1:6001"
+}

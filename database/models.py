@@ -24,7 +24,7 @@ class PaymentStatus(str, Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
     username: Mapped[str | None] = mapped_column(String(255), nullable=True)
     first_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -41,13 +41,17 @@ class Subscription(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, index=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, index=True)
 
-    # Shadowsocks credentials
-    ss_port: Mapped[int] = mapped_column(Integer, unique=True)
-    ss_password: Mapped[str] = mapped_column(String(255))
-    ss_method: Mapped[str] = mapped_column(String(50), default="chacha20-ietf-poly1305")
+    # Marzban (VLESS + Reality) - новая система
+    marzban_username: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True, index=True)
+    subscription_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    # Legacy Shadowsocks credentials (deprecated)
+    ss_port: Mapped[int | None] = mapped_column(Integer, unique=True, nullable=True)
+    ss_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    ss_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # Subscription details
-    plan_type: Mapped[str] = mapped_column(String(50))  # day, week, month, year
+    plan_type: Mapped[str] = mapped_column(String(50))  # trial, day, week, month, year
     status: Mapped[str] = mapped_column(SQLEnum(SubscriptionStatus), default=SubscriptionStatus.ACTIVE)
 
     started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
