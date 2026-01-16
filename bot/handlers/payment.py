@@ -56,7 +56,7 @@ async def send_connection_info(callback: CallbackQuery, subscription, is_trial: 
 📲 **Как подключиться:**
 
 **Android:** v2rayNG
-**iOS:** Streisand, Shadowrocket
+**iPhone / iPad:** Streisand, Shadowrocket
 **Windows:** v2rayN, Nekoray
 **macOS:** V2rayU, Nekoray
 

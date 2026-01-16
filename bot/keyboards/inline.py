@@ -56,7 +56,7 @@ def connection_guide_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
 
     builder.row(
-        InlineKeyboardButton(text="📱 iOS", callback_data="guide_ios"),
+        InlineKeyboardButton(text="📱 iPhone / iPad", callback_data="guide_ios"),
         InlineKeyboardButton(text="🤖 Android", callback_data="guide_android")
     )
     builder.row(

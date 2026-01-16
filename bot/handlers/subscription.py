@@ -5,12 +5,12 @@ from datetime import datetime
 
 from database.database import AsyncSessionLocal
 from services.subscription_service import SubscriptionService
-from services.shadowsocks_service import ShadowsocksService
+
 from bot.keyboards.inline import subscription_plans_keyboard
 
 router = Router()
 subscription_service = SubscriptionService()
-ss_service = ShadowsocksService()
+
 
 
 @router.message(F.text == "💰 Купить подписку")
@@ -56,11 +56,17 @@ async def show_status(message: Message):
             )
             return
 
-        # Генерируем данные для подключения
-        connection_string = ss_service.generate_connection_string(
-            subscription.ss_password, subscription.ss_port
-        )
-        qr_url = ss_service.generate_qr_code_url(connection_string)
+        # Получаем данные о подключении из Marzban
+        connection_info = await subscription_service.get_connection_info(subscription)
+        
+        if "error" in connection_info:
+             await message.answer("⚠️ Ошибка получения данных подписки. Обратитесь к админу.")
+             return
+
+        subscription_url = connection_info.get("subscription_url", "")
+        # Берем первую ссылку из списка или subscription url
+        links = connection_info.get("links", [])
+        vless_link = links[0] if links else subscription_url
 
         # Рассчитываем оставшееся время
         time_left = subscription.expires_at - datetime.utcnow()
@@ -74,20 +80,20 @@ async def show_status(message: Message):
 ⏳ Осталось: {days_left} дней {hours_left} часов
 📆 Истекает: {subscription.expires_at.strftime('%d.%m.%Y %H:%M')}
 
-🔐 Данные для подключения:
+🔐 **Подключение VLESS + Reality**
 
-Сервер: {ss_service.server_host}
-Порт: {subscription.ss_port}
-Пароль: `{subscription.ss_password}`
-Метод шифрования: {subscription.ss_method}
+📱 **Ссылка подписки** (для обновления ключей):
+`{subscription_url}`
 
-📱 Строка подключения (нажмите, чтобы скопировать):
-`{connection_string}`
+🔗 **Прямая ссылка:**
+`{vless_link[:50]}...` (нажмите QR код для полной)
 
-🔗 QR-код для быстрого подключения:
 """
+        from services.marzban_service import marzban_service
+        qr_url = marzban_service.generate_qr_code_url(subscription_url)
+        
         await message.answer(status_text, parse_mode="Markdown")
-        await message.answer_photo(photo=qr_url, caption="📱 Отсканируйте QR-код или импортируйте VLESS-ссылку в приложение")
+        await message.answer_photo(photo=qr_url, caption="📱 Отсканируйте QR-код или импортируйте ссылку в VLESS-клиент")
 
 
 @router.message(F.text == "📱 Инструкция подключения")
@@ -110,7 +116,7 @@ async def show_platform_guide(callback: CallbackQuery):
 
     guides = {
         "ios": """
-📱 Инструкция для iOS:
+📱 Инструкция для iPhone / iPad:
 
 1. Скачайте Streisand из App Store (бесплатно):
    https://apps.apple.com/app/streisand/id6450534064
