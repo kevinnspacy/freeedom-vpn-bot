@@ -16,7 +16,42 @@ subscription_service = SubscriptionService()
 
 @router.message(F.text == "💰 Купить подписку")
 async def show_subscription_plans(message: Message):
-    """Показать планы подписки"""
+    """Показать планы подписки (текстовая кнопка)"""
+    await _show_subscription_plans(message)
+
+
+@router.callback_query(F.data == "buy_subscription")
+async def callback_buy_subscription(callback: CallbackQuery):
+    """Показать планы подписки (inline кнопка)"""
+    text = f"""
+💰 <b>Выберите тариф:</b>
+
+1️⃣ День - {settings.PRICE_DAY}₽
+   • Идеально для тестирования
+
+7️⃣ Неделя - {settings.PRICE_WEEK}₽
+   • Выгода 22%
+
+🗓 Месяц - {settings.PRICE_MONTH}₽
+   • Выгода 45%
+
+📆 3 месяца - {settings.PRICE_3MONTH}₽
+   • Выгода 51%
+
+📅 Год - {settings.PRICE_YEAR}₽
+   • Выгода 54%
+
+✨ <b>Все тарифы включают:</b>
+• Безлимитный трафик
+• Высокая скорость
+• Техподдержка 24/7
+"""
+    await callback.message.edit_text(text, reply_markup=subscription_plans_keyboard(), parse_mode="HTML")
+    await callback.answer()
+
+
+async def _show_subscription_plans(message: Message):
+    """Внутренняя функция показа планов"""
     text = f"""
 💰 Выберите тариф:
 
@@ -30,7 +65,7 @@ async def show_subscription_plans(message: Message):
    • Выгода 45%
 
 📆 3 месяца - {settings.PRICE_3MONTH}₽
-   • Выгода 50%
+   • Выгода 51%
 
 📅 Год - {settings.PRICE_YEAR}₽
    • Выгода 54%
@@ -46,18 +81,31 @@ async def show_subscription_plans(message: Message):
 @router.message(Command("status"))
 @router.message(F.text == "📊 Мой статус")
 async def show_status(message: Message):
+    """Показать статус подписки (текстовая команда)"""
+    await _show_status(message)
+
+
+@router.callback_query(F.data == "my_status")
+async def callback_my_status(callback: CallbackQuery):
+    """Показать статус подписки (inline кнопка)"""
+    await _show_status(callback.message, callback)
+
+
+async def _show_status(message: Message, callback: CallbackQuery = None):
     """Показать статус подписки"""
+    user_id = callback.from_user.id if callback else message.from_user.id
     async with AsyncSessionLocal() as session:
         subscription = await subscription_service.get_active_subscription(
-            session, message.from_user.id
+            session, user_id
         )
 
         if not subscription:
-            await message.answer(
-                "❌ У вас нет активной подписки.\n\n"
-                "💰 Купите подписку, чтобы получить доступ к VPN!",
-                reply_markup=subscription_plans_keyboard()
-            )
+            no_sub_text = "❌ У вас нет активной подписки.\n\n💰 Купите подписку, чтобы получить доступ к VPN!"
+            if callback:
+                await callback.message.edit_text(no_sub_text, reply_markup=subscription_plans_keyboard())
+                await callback.answer()
+            else:
+                await message.answer(no_sub_text, reply_markup=subscription_plans_keyboard())
             return
 
         # Получаем данные о подключении из Marzban
@@ -77,37 +125,88 @@ async def show_status(message: Message):
         days_left = time_left.days
         hours_left = time_left.seconds // 3600
 
+        # Определяем статус
+        if days_left < 1:
+            time_status = f"⏰ <b>{hours_left} часов</b>"
+            urgency = "🔴" if hours_left < 3 else "🟡"
+        else:
+            time_status = f"⏳ <b>{days_left} дней {hours_left} часов</b>"
+            urgency = "🟢" if days_left > 3 else "🟡"
+
+        # Название тарифа
+        plan_names = {
+            "trial": "Тестовый (24 часа)",
+            "day": "1 день",
+            "week": "1 неделя",
+            "month": "1 месяц",
+            "3month": "3 месяца",
+            "year": "1 год"
+        }
+        plan_name = plan_names.get(subscription.plan_type, subscription.plan_type)
+
         status_text = f"""
-✅ Ваша подписка активна!
+{urgency} <b>Подписка активна!</b>
 
-📅 Тариф: {subscription.plan_type}
-⏳ Осталось: {days_left} дней {hours_left} часов
-📆 Истекает: {subscription.expires_at.strftime('%d.%m.%Y %H:%M')}
+📋 <b>Информация о подписке:</b>
+├ Тариф: <b>{plan_name}</b>
+├ Осталось: {time_status}
+└ Истекает: <b>{subscription.expires_at.strftime('%d.%m.%Y в %H:%M')}</b>
 
-🔐 **Подключение VLESS + Reality**
+🔐 <b>Подключение VLESS + Reality</b>
 
-🔗 **Прямая ссылка (нажмите чтобы скопировать):**
-`{vless_link}`
+🔗 <b>Ваша ссылка подключения:</b>
+<code>{vless_link}</code>
 
+💡 <i>Нажмите на ссылку для копирования</i>
+
+━━━━━━━━━━━━━━━━━━━━━
+📱 <b>Как подключиться:</b>
+• <b>Android:</b> v2rayNG
+• <b>iPhone:</b> Streisand, Shadowrocket
+• <b>Windows:</b> v2rayN, Nekoray
+• <b>macOS:</b> V2rayU, Nekoray
+
+📥 <i>QR-код для быстрого подключения ↓</i>
 """
         from services.marzban_service import marzban_service
+        from bot.keyboards.inline import status_keyboard
         qr_url = marzban_service.generate_qr_code_url(subscription_url)
-        
-        await message.answer(status_text, parse_mode="Markdown")
-        await message.answer_photo(photo=qr_url, caption="📱 Отсканируйте QR-код или импортируйте ссылку в VLESS-клиент")
+
+        await message.answer(status_text, parse_mode="HTML", reply_markup=status_keyboard())
+        await message.answer_photo(
+            photo=qr_url,
+            caption=f"📱 <b>QR-код для подключения</b>\n\nОтсканируйте в приложении VLESS-клиента\n\n⏰ Действителен до: {subscription.expires_at.strftime('%d.%m.%Y %H:%M')}",
+            parse_mode="HTML"
+        )
 
 
 @router.message(F.text == "📱 Инструкция подключения")
 async def show_connection_guide(message: Message):
-    """Показать инструкцию по подключению"""
+    """Показать инструкцию по подключению (текстовая кнопка)"""
     from bot.keyboards.inline import connection_guide_keyboard
 
     text = """
-📱 Инструкция по подключению к VPN (VLESS + Reality)
+📱 <b>Инструкция по подключению к VPN</b>
+<i>(VLESS + Reality)</i>
 
 Выберите вашу платформу:
 """
-    await message.answer(text, reply_markup=connection_guide_keyboard())
+    await message.answer(text, reply_markup=connection_guide_keyboard(), parse_mode="HTML")
+
+
+@router.callback_query(F.data == "connection_guide")
+async def callback_connection_guide(callback: CallbackQuery):
+    """Показать инструкцию по подключению (inline кнопка)"""
+    from bot.keyboards.inline import connection_guide_keyboard
+
+    text = """
+📱 <b>Инструкция по подключению к VPN</b>
+<i>(VLESS + Reality)</i>
+
+Выберите вашу платформу:
+"""
+    await callback.message.edit_text(text, reply_markup=connection_guide_keyboard(), parse_mode="HTML")
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("guide_"))
@@ -203,5 +302,6 @@ async def show_platform_guide(callback: CallbackQuery):
     }
 
     guide_text = guides.get(platform, "Инструкция не найдена")
-    await callback.message.edit_text(guide_text)
+    from bot.keyboards.inline import back_to_menu_keyboard
+    await callback.message.edit_text(guide_text, reply_markup=back_to_menu_keyboard())
     await callback.answer()

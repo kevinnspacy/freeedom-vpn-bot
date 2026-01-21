@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     )
 
     BOT_TOKEN: str
+    BOT_USERNAME: str = "freeddomm_bot"
     ADMIN_IDS: str
     SUPPORT_USERNAME: str = "thaifre"
 

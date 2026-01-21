@@ -1,11 +1,12 @@
 from aiogram import Router, F
 from aiogram.filters import CommandStart, Command, CommandObject
-from aiogram.types import Message
+from aiogram.types import Message, ReplyKeyboardRemove
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.database import AsyncSessionLocal
 from services.user_service import UserService
-from bot.keyboards.reply import main_menu_keyboard, admin_menu_keyboard
+from services.referral_service import referral_service
+from bot.keyboards.inline import main_menu_keyboard as inline_main_menu
 from config import settings
 
 router = Router()
@@ -15,13 +16,25 @@ router = Router()
 async def cmd_start(message: Message, command: CommandObject):
     """Обработчик команды /start"""
     referrer_id = None
+    referral_message = ""
+
     args = command.args
-    if args and args.isdigit():
-        referrer_id = int(args)
-        if referrer_id == message.from_user.id:
-            referrer_id = None  # Нельзя пригласить самого себя
 
     async with AsyncSessionLocal() as session:
+        # Проверяем реферальный код
+        if args:
+            # Новый формат: ref_code
+            if args.startswith("ref_"):
+                referrer = await referral_service.get_user_by_referral_code(session, args)
+                if referrer and referrer.telegram_id != message.from_user.id:
+                    referrer_id = referrer.telegram_id
+                    referral_message = f"\n\n🎁 Вы пришли по реферальной ссылке от {referrer.first_name or 'пользователя'}!"
+            # Старый формат: telegram_id
+            elif args.isdigit():
+                referrer_id = int(args)
+                if referrer_id == message.from_user.id:
+                    referrer_id = None
+
         # Создаём или обновляем пользователя
         user = await UserService.get_or_create_user(
             session,
@@ -41,12 +54,9 @@ async def cmd_start(message: Message, command: CommandObject):
 
         await session.commit()
 
-    # Выбираем клавиатуру
-    keyboard = admin_menu_keyboard() if is_admin else main_menu_keyboard()
-
     import html
     safe_first_name = html.escape(message.from_user.first_name)
-    
+
     welcome_text = f"""
 👋 Привет, {safe_first_name}!
 
@@ -64,7 +74,12 @@ async def cmd_start(message: Message, command: CommandObject):
 👇 Начни прямо сейчас!
 """
 
-    await message.answer(welcome_text, reply_markup=keyboard, parse_mode="HTML")
+    # Убираем старую reply-клавиатуру и отправляем inline-кнопки
+    await message.answer(
+        welcome_text + referral_message,
+        reply_markup=inline_main_menu(is_admin=is_admin),
+        parse_mode="HTML"
+    )
 
 
 @router.message(Command("myid"))

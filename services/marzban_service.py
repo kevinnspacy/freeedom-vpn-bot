@@ -69,10 +69,41 @@ class MarzbanService:
             return response.json() if response.text else {}
 
     @staticmethod
-    def generate_username(telegram_id: int) -> str:
-        """Генерация уникального username для Marzban (prefix freedom_ для отличия от другого бота)"""
-        random_suffix = ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(6))
-        return f"freedom_{telegram_id}_{random_suffix}"
+    def generate_username(telegram_id: int, first_name: str = "User", plan_type: str = "sub") -> str:
+        """Генерация информативного username для Marzban (отображается в VPN-клиенте через {USERNAME})"""
+        import re
+        # Очищаем имя от спецсимволов, оставляем только буквы и цифры
+        clean_name = re.sub(r'[^a-zA-Zа-яА-ЯёЁ0-9]', '', first_name or "User")[:8]
+        # Транслитерация кириллицы
+        translit_map = {
+            'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
+            'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+            'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+            'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch',
+            'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya'
+        }
+        name_translit = ''.join(translit_map.get(c.lower(), c) for c in clean_name).lower()
+        if not name_translit:
+            name_translit = "user"
+
+        # Короткий суффикс для уникальности
+        random_suffix = ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(4))
+
+        # Формат: FreedomVPN_Имя_суффикс (для красивого отображения в клиенте)
+        return f"FreedomVPN_{name_translit}_{random_suffix}"
+
+    def _generate_note(self, plan_type: str, first_name: str, expire_timestamp: int) -> str:
+        """Генерация note для отображения в VPN-клиенте (как у Sparta VPN)"""
+        expire_date = datetime.fromtimestamp(expire_timestamp)
+        days_left = max(1, (expire_date - datetime.now()).days)
+
+        # Эмодзи в зависимости от типа подписки
+        plan_emoji = "🎁" if plan_type == "trial" else "💎"
+
+        # Ограничиваем имя до 12 символов
+        name = (first_name or "User")[:12]
+
+        return f"FreedomVPN {days_left}д {plan_emoji} {name}\n✅ До {expire_date.strftime('%d.%m.%Y')}"
 
     def calculate_expire_timestamp(self, plan_type: str) -> int:
         """Рассчитать timestamp истечения подписки"""
@@ -99,6 +130,7 @@ class MarzbanService:
         self,
         telegram_id: int,
         plan_type: str,
+        first_name: str = "User",
         data_limit_gb: int = 0  # 0 = безлимит
     ) -> Dict[str, Any]:
         """
@@ -107,8 +139,11 @@ class MarzbanService:
         Returns:
             Dict с данными пользователя включая subscription_url
         """
-        username = self.generate_username(telegram_id)
+        username = self.generate_username(telegram_id, first_name, plan_type)
         expire_timestamp = self.calculate_expire_timestamp(plan_type)
+
+        # Генерируем note для отображения в VPN-клиенте
+        note = self._generate_note(plan_type, first_name, expire_timestamp)
 
         user_data = {
             "username": username,
@@ -124,7 +159,7 @@ class MarzbanService:
             "data_limit": data_limit_gb * 1024 * 1024 * 1024 if data_limit_gb > 0 else 0,
             "data_limit_reset_strategy": "no_reset",
             "status": "active",
-            "note": f"Telegram ID: {telegram_id}, Plan: {plan_type}"
+            "note": note
         }
 
         try:
@@ -166,7 +201,7 @@ class MarzbanService:
             logger.error(f"Failed to delete Marzban user {username}: {e.response.text}")
             return False
 
-    async def extend_user(self, username: str, plan_type: str) -> Dict[str, Any]:
+    async def extend_user(self, username: str, plan_type: str, first_name: str = "User") -> Dict[str, Any]:
         """Продлить подписку пользователя"""
         # Получаем текущие данные пользователя
         user = await self.get_user(username)
@@ -196,10 +231,14 @@ class MarzbanService:
         else:
             raise ValueError(f"Unknown plan type: {plan_type}")
 
+        # Генерируем обновлённый note для отображения в VPN-клиенте
+        note = self._generate_note(plan_type, first_name, new_expire)
+
         # Обновляем пользователя
         update_data = {
             "expire": new_expire,
-            "status": "active"
+            "status": "active",
+            "note": note
         }
 
         result = await self._request("PUT", f"/api/user/{username}", json_data=update_data)

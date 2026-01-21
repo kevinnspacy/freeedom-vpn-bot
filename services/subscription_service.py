@@ -35,6 +35,7 @@ class SubscriptionService:
         session: AsyncSession,
         telegram_id: int,
         plan_type: str,
+        first_name: str = "User",
     ) -> Subscription:
         """Создать новую подписку через Marzban (VLESS + Reality)"""
 
@@ -42,7 +43,8 @@ class SubscriptionService:
         try:
             marzban_user = await marzban_service.create_user(
                 telegram_id=telegram_id,
-                plan_type=plan_type
+                plan_type=plan_type,
+                first_name=first_name
             )
             marzban_username = marzban_user.get("username")
             subscription_url = marzban_user.get("subscription_url", "")
@@ -107,13 +109,14 @@ class SubscriptionService:
         session: AsyncSession,
         subscription: Subscription,
         plan_type: str,
+        first_name: str = "User",
     ) -> Subscription:
         """Продлить существующую подписку"""
 
         # Продлеваем в Marzban
         if subscription.marzban_username:
             try:
-                await marzban_service.extend_user(subscription.marzban_username, plan_type)
+                await marzban_service.extend_user(subscription.marzban_username, plan_type, first_name)
             except Exception as e:
                 logger.error(f"Failed to extend Marzban user: {e}")
                 raise

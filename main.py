@@ -38,8 +38,8 @@ async def main():
     dp.include_router(start.router)
     dp.include_router(subscription.router)
     dp.include_router(payment.router)
-    dp.include_router(admin.router)
     dp.include_router(referral.router)
+    dp.include_router(admin.router)
 
     logger.info("Starting bot...")
 

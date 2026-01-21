@@ -122,6 +122,7 @@ async def process_trial_subscription(callback: CallbackQuery):
                 session,
                 telegram_id=callback.from_user.id,
                 plan_type="trial",
+                first_name=callback.from_user.first_name or "User",
             )
             await session.commit()
 
@@ -207,15 +208,17 @@ async def process_balance_payment(callback: CallbackQuery):
             session, callback.from_user.id
         )
         
+        first_name = callback.from_user.first_name or "User"
+
         if existing_subscription:
             subscription = await subscription_service.extend_subscription(
-                session, existing_subscription, plan_type
+                session, existing_subscription, plan_type, first_name
             )
         else:
             subscription = await subscription_service.create_subscription(
-                session, callback.from_user.id, plan_type
+                session, callback.from_user.id, plan_type, first_name
             )
-            
+
         # Начисляем реферальный бонус пригласившему (даже при оплате с баланса? Да, почему нет, если деньги реальные были)
         # Хотя стоп, баланс уже бонусный. Начислять бонусы с бонусов? Это инфляция.
         # Обычно с бонусных оплат реферальные НЕ начисляются. 
@@ -297,10 +300,12 @@ async def check_payment_status(callback: CallbackQuery, state: FSMContext):
                     session, callback.from_user.id
                 )
 
+                first_name = callback.from_user.first_name or "User"
+
                 if existing_subscription:
                     # Продлеваем существующую подписку
                     subscription = await subscription_service.extend_subscription(
-                        session, existing_subscription, payment.plan_type
+                        session, existing_subscription, payment.plan_type, first_name
                     )
                 else:
                     # Создаём новую подписку
@@ -308,6 +313,7 @@ async def check_payment_status(callback: CallbackQuery, state: FSMContext):
                         session,
                         telegram_id=callback.from_user.id,
                         plan_type=payment.plan_type,
+                        first_name=first_name,
                     )
 
                 # Начисляем реферальный бонус
@@ -356,5 +362,19 @@ async def cancel_payment(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "back_to_menu")
 async def back_to_menu(callback: CallbackQuery):
     """Вернуться в главное меню"""
-    await callback.message.delete()
+    from bot.keyboards.inline import main_menu_keyboard
+    from config import settings
+
+    is_admin = callback.from_user.id in settings.admin_ids_list
+
+    text = """
+🚀 <b>FreedomVPN</b> — твой свободный интернет без границ.
+
+Выберите действие:
+"""
+    await callback.message.edit_text(
+        text,
+        reply_markup=main_menu_keyboard(is_admin=is_admin),
+        parse_mode="HTML"
+    )
     await callback.answer()
