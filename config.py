@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     # Server
     SERVER_LOCATION: str = "Netherlands"
 
+    # Flutter App API
+    FLUTTER_API_KEY: str = ""
+
     @property
     def admin_ids_list(self) -> List[int]:
         return [int(id.strip()) for id in self.ADMIN_IDS.split(",")]

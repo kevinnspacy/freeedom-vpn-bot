@@ -74,6 +74,58 @@ async def health_check():
     return {"status": "healthy"}
 
 
+# ============== FLUTTER APP API ==============
+
+@app.get("/api/subscription/{telegram_id}")
+async def get_subscription_status(telegram_id: int, api_key: str = ""):
+    """
+    API для Flutter-приложения: получить статус подписки пользователя
+    
+    Args:
+        telegram_id: Telegram ID пользователя
+        api_key: API ключ для аутентификации
+    
+    Returns:
+        JSON с информацией о подписке
+    """
+    from datetime import datetime
+    
+    # Проверка API ключа
+    if not settings.FLUTTER_API_KEY or api_key != settings.FLUTTER_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
+    
+    try:
+        async with AsyncSessionLocal() as session:
+            subscription = await subscription_service.get_active_subscription(
+                session, telegram_id
+            )
+            
+            if not subscription:
+                return {
+                    "active": False,
+                    "message": "No active subscription"
+                }
+            
+            # Рассчитываем оставшиеся дни
+            now = datetime.utcnow()
+            days_left = max(0, (subscription.expires_at - now).days)
+            hours_left = max(0, int((subscription.expires_at - now).total_seconds() / 3600))
+            
+            return {
+                "active": True,
+                "plan_type": subscription.plan_type,
+                "expires_at": subscription.expires_at.isoformat(),
+                "days_left": days_left,
+                "hours_left": hours_left,
+                "subscription_url": subscription.subscription_url,
+                "marzban_username": subscription.marzban_username
+            }
+    
+    except Exception as e:
+        logger.error(f"Error getting subscription status: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080)
