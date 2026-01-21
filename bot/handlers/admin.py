@@ -100,7 +100,7 @@ async def show_admin_stats(callback: CallbackQuery):
 
         # Трафик из Marzban
         marzban_users = await marzban_service.get_all_users()
-        total_traffic_bytes = sum(u.get("used_traffic", 0) for u in marzban_users)
+        total_traffic_bytes = sum((u.get("used_traffic") or 0) for u in marzban_users)
         total_traffic_gb = total_traffic_bytes / (1024 ** 3)
         total_traffic_formatted = f"{total_traffic_gb:.2f} GB"
         if total_traffic_gb > 1024:
@@ -239,7 +239,7 @@ async def show_admin_traffic(callback: CallbackQuery):
         # Сортируем по использованному трафику (больше - выше)
         sorted_users = sorted(
             marzban_users,
-            key=lambda x: x.get("used_traffic", 0),
+            key=lambda x: x.get("used_traffic") or 0,
             reverse=True
         )
 
@@ -249,11 +249,11 @@ async def show_admin_traffic(callback: CallbackQuery):
         traffic_text = "🌐 <b>Трафик клиентов (топ-15):</b>\n\n"
 
         for i, user in enumerate(top_users, 1):
-            username = user.get("username", "N/A")
-            used_bytes = user.get("used_traffic", 0)
-            data_limit = user.get("data_limit", 0)
-            status = user.get("status", "unknown")
-            expire = user.get("expire", 0)
+            username = user.get("username") or "N/A"
+            used_bytes = user.get("used_traffic") or 0
+            data_limit = user.get("data_limit") or 0
+            status = user.get("status") or "unknown"
+            expire = user.get("expire") or 0
 
             # Форматируем трафик
             if used_bytes >= 1024 ** 3:
@@ -299,7 +299,7 @@ async def show_admin_traffic(callback: CallbackQuery):
             )
 
         # Добавляем общий итог
-        total_bytes = sum(u.get("used_traffic", 0) for u in marzban_users)
+        total_bytes = sum((u.get("used_traffic") or 0) for u in marzban_users)
         if total_bytes >= 1024 ** 4:
             total_str = f"{total_bytes / (1024 ** 4):.2f} TB"
         elif total_bytes >= 1024 ** 3:
