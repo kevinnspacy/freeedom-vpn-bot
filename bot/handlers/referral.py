@@ -126,10 +126,11 @@ async def callback_enter_promocode(callback: CallbackQuery, state: FSMContext):
 
 Отправьте промокод в чат, чтобы активировать скидку или бонус.
 
-<i>Пример: FREEWEEK</i>
+<i>Пример: PROMOCODE</i>
 """
     await callback.message.edit_text(text, reply_markup=back_to_menu_keyboard(), parse_mode="HTML")
     await state.set_state(PromocodeStates.waiting_for_code)
+    await state.update_data(attempts=0)
     await callback.answer()
 
 
@@ -138,6 +139,11 @@ async def process_promocode_input(message: Message, state: FSMContext):
     """Обработка введённого промокода"""
     code = message.text.strip().upper()
 
+    # Получаем количество попыток
+    data = await state.get_data()
+    attempts = data.get("attempts", 0) + 1
+    await state.update_data(attempts=attempts)
+
     async with AsyncSessionLocal() as session:
         # Валидируем промокод (plan_type пока не важен для bonus_days)
         validation = await promocode_service.validate_promocode(
@@ -145,12 +151,24 @@ async def process_promocode_input(message: Message, state: FSMContext):
         )
 
         if not validation["valid"]:
-            await message.answer(
-                f"❌ {validation['error']}\n\n"
-                f"Попробуйте другой промокод или нажмите «Главное меню».",
-                reply_markup=back_to_menu_keyboard(),
-                parse_mode="HTML"
-            )
+            if attempts >= 5:
+                # После 5 неудачных попыток - возврат в главное меню
+                is_admin = message.from_user.id in settings.admin_ids_list
+                await message.answer(
+                    f"❌ {validation['error']}\n\n"
+                    f"Вы исчерпали 5 попыток ввода промокода.",
+                    reply_markup=main_menu_keyboard(is_admin=is_admin),
+                    parse_mode="HTML"
+                )
+                await state.clear()
+            else:
+                # Предлагаем попробовать ещё раз
+                await message.answer(
+                    f"❌ {validation['error']}\n\n"
+                    f"Попробуйте другой промокод (попытка {attempts}/5)",
+                    reply_markup=back_to_menu_keyboard(),
+                    parse_mode="HTML"
+                )
             return
 
         promocode = validation["promocode"]

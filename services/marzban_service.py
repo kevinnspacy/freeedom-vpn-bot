@@ -110,7 +110,7 @@ class MarzbanService:
         now = datetime.now()
 
         if plan_type == "trial":
-            expire = now + timedelta(hours=24)
+            expire = now + timedelta(hours=72)
         elif plan_type == "day":
             expire = now + timedelta(days=1)
         elif plan_type == "week":

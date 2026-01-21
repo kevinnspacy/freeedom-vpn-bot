@@ -211,6 +211,124 @@ async def show_admin_payments(callback: CallbackQuery):
     await callback.answer()
 
 
+@router.callback_query(F.data == "admin_traffic")
+async def show_admin_traffic(callback: CallbackQuery):
+    """Показать трафик по клиентам"""
+    if not await is_admin(callback.from_user.id):
+        await callback.answer("❌ Нет доступа", show_alert=True)
+        return
+
+    await callback.answer("⏳ Загрузка данных...")
+
+    try:
+        # Получаем всех пользователей из Marzban
+        marzban_users = await marzban_service.get_all_users()
+
+        if not marzban_users:
+            try:
+                await callback.message.edit_text(
+                    "🌐 <b>Трафик клиентов</b>\n\n"
+                    "Активных клиентов не найдено",
+                    reply_markup=admin_panel_keyboard(),
+                    parse_mode="HTML"
+                )
+            except TelegramBadRequest:
+                pass
+            return
+
+        # Сортируем по использованному трафику (больше - выше)
+        sorted_users = sorted(
+            marzban_users,
+            key=lambda x: x.get("used_traffic", 0),
+            reverse=True
+        )
+
+        # Берём топ-15 по трафику
+        top_users = sorted_users[:15]
+
+        traffic_text = "🌐 <b>Трафик клиентов (топ-15):</b>\n\n"
+
+        for i, user in enumerate(top_users, 1):
+            username = user.get("username", "N/A")
+            used_bytes = user.get("used_traffic", 0)
+            data_limit = user.get("data_limit", 0)
+            status = user.get("status", "unknown")
+            expire = user.get("expire", 0)
+
+            # Форматируем трафик
+            if used_bytes >= 1024 ** 3:
+                used_str = f"{used_bytes / (1024 ** 3):.2f} GB"
+            elif used_bytes >= 1024 ** 2:
+                used_str = f"{used_bytes / (1024 ** 2):.1f} MB"
+            else:
+                used_str = f"{used_bytes / 1024:.0f} KB"
+
+            # Лимит трафика
+            if data_limit > 0:
+                if data_limit >= 1024 ** 3:
+                    limit_str = f" / {data_limit / (1024 ** 3):.0f} GB"
+                else:
+                    limit_str = f" / {data_limit / (1024 ** 2):.0f} MB"
+            else:
+                limit_str = " (∞)"
+
+            # Статус и дата истечения
+            status_emoji = "✅" if status == "active" else "❌"
+            expire_str = ""
+            if expire > 0:
+                from datetime import datetime
+                expire_date = datetime.fromtimestamp(expire)
+                days_left = (expire_date - datetime.now()).days
+                if days_left > 0:
+                    expire_str = f" ({days_left}д)"
+                elif days_left == 0:
+                    expire_str = " (сегодня)"
+                else:
+                    expire_str = " (истёк)"
+
+            # Извлекаем имя из username (формат: FreedomVPN_name_suffix)
+            display_name = username
+            if username.startswith("FreedomVPN_"):
+                parts = username.split("_")
+                if len(parts) >= 2:
+                    display_name = parts[1][:10]
+
+            traffic_text += (
+                f"{i}. {status_emoji} <b>{display_name}</b>{expire_str}\n"
+                f"   📊 {used_str}{limit_str}\n"
+            )
+
+        # Добавляем общий итог
+        total_bytes = sum(u.get("used_traffic", 0) for u in marzban_users)
+        if total_bytes >= 1024 ** 4:
+            total_str = f"{total_bytes / (1024 ** 4):.2f} TB"
+        elif total_bytes >= 1024 ** 3:
+            total_str = f"{total_bytes / (1024 ** 3):.2f} GB"
+        else:
+            total_str = f"{total_bytes / (1024 ** 2):.1f} MB"
+
+        traffic_text += f"\n📈 <b>Всего:</b> {total_str} ({len(marzban_users)} клиентов)"
+
+        try:
+            await callback.message.edit_text(
+                traffic_text,
+                reply_markup=admin_panel_keyboard(),
+                parse_mode="HTML"
+            )
+        except TelegramBadRequest:
+            pass
+
+    except Exception as e:
+        logger.error(f"Failed to get traffic stats: {e}")
+        try:
+            await callback.message.edit_text(
+                f"❌ Ошибка при получении данных: {e}",
+                reply_markup=admin_panel_keyboard()
+            )
+        except TelegramBadRequest:
+            pass
+
+
 @router.message(Command("createpromo"))
 async def cmd_create_promocode(message: Message):
     """

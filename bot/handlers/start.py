@@ -6,10 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database.database import AsyncSessionLocal
 from services.user_service import UserService
 from services.referral_service import referral_service
+from services.subscription_service import SubscriptionService
 from bot.keyboards.inline import main_menu_keyboard as inline_main_menu
 from config import settings
 
 router = Router()
+subscription_service = SubscriptionService()
 
 
 @router.message(CommandStart())
@@ -17,6 +19,7 @@ async def cmd_start(message: Message, command: CommandObject):
     """Обработчик команды /start"""
     referrer_id = None
     referral_message = ""
+    show_trial = True
 
     args = command.args
 
@@ -48,6 +51,9 @@ async def cmd_start(message: Message, command: CommandObject):
         # Проверяем, является ли пользователь админом
         is_admin = user.telegram_id in settings.admin_ids_list
 
+        # Проверяем, использовал ли пользователь тестовый период
+        show_trial = not await subscription_service.has_used_trial(session, message.from_user.id)
+
         if is_admin and not user.is_admin:
             user.is_admin = True
             await session.commit()
@@ -55,9 +61,10 @@ async def cmd_start(message: Message, command: CommandObject):
         await session.commit()
 
     import html
-    safe_first_name = html.escape(message.from_user.first_name)
+    safe_first_name = html.escape(message.from_user.first_name or "друг")
 
-    welcome_text = f"""
+    if show_trial:
+        welcome_text = f"""
 👋 Привет, {safe_first_name}!
 
 🚀 <b>FreedomVPN</b> — твой свободный интернет без границ.
@@ -68,16 +75,24 @@ async def cmd_start(message: Message, command: CommandObject):
 🌍 <b>Доступ</b> к Instagram, Netflix, ChatGPT
 📱 Работает на <b>iPhone, Android, PC и Mac</b>
 
-🎁 <b>ПОПРОБУЙ БЕСПЛАТНО (24 часа)</b>
-Жми "💰 Купить подписку" ➡️ "Попробовать БЕСПЛАТНО"
+🎁 <b>ПОПРОБУЙ БЕСПЛАТНО (72 часа)</b>
+Жми кнопку ниже!
 
 👇 Начни прямо сейчас!
+"""
+    else:
+        welcome_text = f"""
+👋 С возвращением, {safe_first_name}!
+
+🚀 <b>FreedomVPN</b> — твой свободный интернет без границ.
+
+👇 Выберите действие:
 """
 
     # Убираем старую reply-клавиатуру и отправляем inline-кнопки
     await message.answer(
         welcome_text + referral_message,
-        reply_markup=inline_main_menu(is_admin=is_admin),
+        reply_markup=inline_main_menu(is_admin=is_admin, show_trial=show_trial),
         parse_mode="HTML"
     )
 

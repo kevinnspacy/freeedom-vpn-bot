@@ -16,7 +16,7 @@ class SubscriptionService:
         now = datetime.utcnow()
 
         if plan_type == "trial":
-            return now + timedelta(hours=24)
+            return now + timedelta(hours=72)
         elif plan_type == "day":
             return now + timedelta(days=1)
         elif plan_type == "week":
@@ -128,7 +128,7 @@ class SubscriptionService:
         else:
             # Добавляем время к текущей дате истечения
             if plan_type == "trial":
-                subscription.expires_at += timedelta(hours=24)
+                subscription.expires_at += timedelta(hours=72)
             elif plan_type == "day":
                 subscription.expires_at += timedelta(days=1)
             elif plan_type == "week":

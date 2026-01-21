@@ -135,7 +135,7 @@ async def _show_status(message: Message, callback: CallbackQuery = None):
 
         # Название тарифа
         plan_names = {
-            "trial": "Тестовый (24 часа)",
+            "trial": "Тестовый (72 часа)",
             "day": "1 день",
             "week": "1 неделя",
             "month": "1 месяц",

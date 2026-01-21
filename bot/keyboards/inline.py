@@ -3,15 +3,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from config import settings
 
 
-def subscription_plans_keyboard(show_trial: bool = True) -> InlineKeyboardMarkup:
-    """Клавиатура с планами подписки"""
+def subscription_plans_keyboard(show_trial: bool = False) -> InlineKeyboardMarkup:
+    """Клавиатура с планами подписки (тестовый период теперь в главном меню)"""
     builder = InlineKeyboardBuilder()
-
-    # Тестовый период (только для новых пользователей)
-    if show_trial:
-        builder.row(
-            InlineKeyboardButton(text="🎁 Попробовать БЕСПЛАТНО (24 часа)", callback_data="buy_trial")
-        )
 
     builder.row(
         InlineKeyboardButton(text=f"1️⃣ День - {settings.PRICE_DAY}₽", callback_data="buy_day")
@@ -102,14 +96,23 @@ def admin_panel_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")
     )
     builder.row(
+        InlineKeyboardButton(text="🌐 Трафик клиентов", callback_data="admin_traffic")
+    )
+    builder.row(
         InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_menu")
     )
 
     return builder.as_markup()
 
-def main_menu_keyboard(is_admin: bool = False) -> InlineKeyboardMarkup:
+def main_menu_keyboard(is_admin: bool = False, show_trial: bool = False) -> InlineKeyboardMarkup:
     """Главное меню бота"""
     builder = InlineKeyboardBuilder()
+
+    # Тестовый период на главной странице (только для новых пользователей)
+    if show_trial:
+        builder.row(
+            InlineKeyboardButton(text="🎁 Попробовать БЕСПЛАТНО (72 часа)", callback_data="buy_trial")
+        )
 
     builder.row(
         InlineKeyboardButton(text="💰 Купить подписку", callback_data="buy_subscription")
@@ -145,7 +148,7 @@ def referral_keyboard(referral_link: str = "") -> InlineKeyboardMarkup:
 
     if referral_link:
         # Кнопка "Поделиться" - открывает диалог выбора чата
-        share_text = "🚀 Попробуй FreedomVPN - быстрый VPN!\n✅ YouTube 4K без тормозов\n✅ Бесплатно 24 часа"
+        share_text = "🚀 Попробуй FreedomVPN - быстрый VPN!\n✅ YouTube 4K без тормозов\n✅ Бесплатно 72 часа"
         builder.row(
             InlineKeyboardButton(
                 text="📤 Поделиться",
