@@ -126,6 +126,102 @@ async def get_subscription_status(telegram_id: int, api_key: str = ""):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+@app.get("/api/servers")
+async def get_servers(api_key: str = ""):
+    """
+    API для Flutter: получить список доступных серверов
+    """
+    # Проверка API ключа
+    if not settings.FLUTTER_API_KEY or api_key != settings.FLUTTER_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
+    
+    try:
+        # Возвращаем информацию о сервере из Marzban
+        from services.marzban_service import marzban_service
+        
+        # Получаем информацию о сервере
+        server_info = await marzban_service.get_server_info()
+        
+        return [
+            {
+                "name": f"🚀 {settings.SERVER_LOCATION}",
+                "location": settings.SERVER_LOCATION,
+                "protocol": "VLESS + Reality",
+                "host": server_info.get("host", "107.189.23.38"),
+                "port": server_info.get("port", 443),
+                "available": True
+            }
+        ]
+    except Exception as e:
+        logger.error(f"Error getting servers: {e}")
+        # Fallback - вернуть дефолтный сервер
+        return [
+            {
+                "name": f"🚀 {settings.SERVER_LOCATION}",
+                "location": settings.SERVER_LOCATION,
+                "protocol": "VLESS + Reality",
+                "host": "107.189.23.38",
+                "port": 443,
+                "available": True
+            }
+        ]
+
+
+@app.get("/api/vless/{telegram_id}")
+async def get_vless_link(telegram_id: int, api_key: str = ""):
+    """
+    API для Flutter: получить VLESS ссылку для подключения
+    """
+    # Проверка API ключа
+    if not settings.FLUTTER_API_KEY or api_key != settings.FLUTTER_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
+    
+    try:
+        async with AsyncSessionLocal() as session:
+            subscription = await subscription_service.get_active_subscription(
+                session, telegram_id
+            )
+            
+            if not subscription:
+                raise HTTPException(status_code=404, detail="No active subscription")
+            
+            if not subscription.subscription_url:
+                raise HTTPException(status_code=404, detail="No VLESS configuration found")
+            
+            # Получаем ссылки из Marzban
+            from services.marzban_service import marzban_service
+            
+            try:
+                links = await marzban_service.get_user_links(subscription.marzban_username)
+                vless_links = links.get("links", [])
+                
+                # Находим первую VLESS ссылку
+                vless_link = next(
+                    (link for link in vless_links if link.startswith("vless://")),
+                    subscription.subscription_url
+                )
+                
+                return {
+                    "vless_link": vless_link,
+                    "subscription_url": subscription.subscription_url,
+                    "all_links": vless_links
+                }
+            except Exception as e:
+                logger.error(f"Error getting VLESS links from Marzban: {e}")
+                return {
+                    "vless_link": subscription.subscription_url,
+                    "subscription_url": subscription.subscription_url,
+                    "all_links": []
+                }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting VLESS link: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080)
+
