@@ -126,6 +126,67 @@ async def get_subscription_status(telegram_id: int, api_key: str = ""):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+@app.get("/api/subscription/by-username/{marzban_username}")
+async def get_subscription_by_username(marzban_username: str, api_key: str = ""):
+    """
+    API для Flutter-приложения: получить статус подписки по marzban username.
+    Автоматически определяет подписку из VLESS конфига (FreedomVPN_xxx_yyy).
+    
+    Args:
+        marzban_username: Username из VLESS конфига (напр. FreedomVPN_ivan_abc1)
+        api_key: API ключ для аутентификации
+    """
+    from datetime import datetime
+    from sqlalchemy import select
+    from database.models import Subscription, SubscriptionStatus
+    
+    # Проверка API ключа
+    if not settings.FLUTTER_API_KEY or api_key != settings.FLUTTER_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
+    
+    try:
+        async with AsyncSessionLocal() as session:
+            # Поиск по marzban_username
+            result = await session.execute(
+                select(Subscription).where(
+                    Subscription.marzban_username == marzban_username,
+                    Subscription.status == SubscriptionStatus.ACTIVE
+                )
+            )
+            subscription = result.scalar_one_or_none()
+            
+            if not subscription:
+                return {
+                    "active": False,
+                    "message": "Subscription not found"
+                }
+            
+            # Рассчитываем оставшиеся дни
+            now = datetime.utcnow()
+            if subscription.expires_at < now:
+                return {
+                    "active": False,
+                    "message": "Subscription expired"
+                }
+            
+            days_left = max(0, (subscription.expires_at - now).days)
+            hours_left = max(0, int((subscription.expires_at - now).total_seconds() / 3600))
+            
+            return {
+                "active": True,
+                "plan_type": subscription.plan_type,
+                "expires_at": subscription.expires_at.isoformat(),
+                "days_left": days_left,
+                "hours_left": hours_left,
+                "telegram_id": subscription.telegram_id,
+                "marzban_username": subscription.marzban_username
+            }
+    
+    except Exception as e:
+        logger.error(f"Error getting subscription by username: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 @app.get("/api/servers")
 async def get_servers(api_key: str = ""):
     """
