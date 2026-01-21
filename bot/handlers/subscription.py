@@ -165,19 +165,46 @@ async def _show_status(message: Message, callback: CallbackQuery = None):
 • <b>iPhone:</b> Streisand, Shadowrocket
 • <b>Windows:</b> v2rayN, Nekoray
 • <b>macOS:</b> V2rayU, Nekoray
-
-📥 <i>QR-код для быстрого подключения ↓</i>
 """
-        from services.marzban_service import marzban_service
         from bot.keyboards.inline import status_keyboard
-        qr_url = marzban_service.generate_qr_code_url(subscription_url)
 
         await message.answer(status_text, parse_mode="HTML", reply_markup=status_keyboard())
-        await message.answer_photo(
+
+
+@router.callback_query(F.data == "show_qr_code")
+async def show_qr_code(callback: CallbackQuery):
+    """Показать QR-код для подключения"""
+    async with AsyncSessionLocal() as session:
+        subscription = await subscription_service.get_active_subscription(
+            session, callback.from_user.id
+        )
+
+        if not subscription:
+            await callback.answer("❌ У вас нет активной подписки", show_alert=True)
+            return
+
+        # Получаем ссылку подписки
+        subscription_url = subscription.subscription_url
+        if not subscription_url and subscription.marzban_username:
+            from services.marzban_service import marzban_service
+            try:
+                subscription_url = await marzban_service.get_subscription_url(subscription.marzban_username)
+            except Exception:
+                pass
+
+        if not subscription_url:
+            await callback.answer("❌ Ссылка подписки не найдена", show_alert=True)
+            return
+
+        from services.marzban_service import marzban_service
+        qr_url = marzban_service.generate_qr_code_url(subscription_url)
+
+        await callback.message.answer_photo(
             photo=qr_url,
             caption=f"📱 <b>QR-код для подключения</b>\n\nОтсканируйте в приложении VLESS-клиента\n\n⏰ Действителен до: {subscription.expires_at.strftime('%d.%m.%Y %H:%M')}",
             parse_mode="HTML"
         )
+        await callback.answer()
 
 
 @router.message(F.text == "📱 Инструкция подключения")

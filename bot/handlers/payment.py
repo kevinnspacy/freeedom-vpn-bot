@@ -63,17 +63,11 @@ async def send_connection_info(callback: CallbackQuery, subscription, is_trial: 
 3. Импортируйте конфигурацию из буфера
 4. Подключитесь!
 
-🔗 QR-код отправлен следующим сообщением.
+💡 QR-код доступен в разделе "Мой статус"
 """
+        from bot.keyboards.inline import status_keyboard
 
-        await callback.message.edit_text(success_text, parse_mode="Markdown")
-
-        # Отправляем QR-код с ссылкой подписки
-        qr_url = marzban_service.generate_qr_code_url(subscription_url)
-        await callback.message.answer_photo(
-            photo=qr_url,
-            caption="📱 Отсканируйте QR-код в приложении v2rayNG/Streisand"
-        )
+        await callback.message.edit_text(success_text, parse_mode="Markdown", reply_markup=status_keyboard())
 
     except Exception as e:
         logger.error(f"Failed to get connection info: {e}")

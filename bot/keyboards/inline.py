@@ -183,6 +183,9 @@ def status_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
 
     builder.row(
+        InlineKeyboardButton(text="📱 Показать QR-код", callback_data="show_qr_code")
+    )
+    builder.row(
         InlineKeyboardButton(text="🔄 Обновить ключ", callback_data="refresh_key")
     )
     builder.row(

@@ -241,19 +241,11 @@ async def process_promocode_input(message: Message, state: FSMContext):
 <code>{vless_link}</code>
 
 💡 <i>Нажмите на ссылку, чтобы скопировать</i>
-"""
-            is_admin = message.from_user.id in settings.admin_ids_list
-            await message.answer(success_text, parse_mode="HTML", reply_markup=main_menu_keyboard(is_admin=is_admin))
 
-            # Отправляем QR-код
-            from services.marzban_service import marzban_service
-            subscription_url = connection_info.get("subscription_url", "")
-            if subscription_url:
-                qr_url = marzban_service.generate_qr_code_url(subscription_url)
-                await message.answer_photo(
-                    photo=qr_url,
-                    caption="📱 QR-код для подключения"
-                )
+📱 QR-код доступен в разделе "Мой статус"
+"""
+            from bot.keyboards.inline import status_keyboard
+            await message.answer(success_text, parse_mode="HTML", reply_markup=status_keyboard())
 
             logger.info(f"Promocode {code} activated for user {message.from_user.id}: {bonus_days} days")
 
