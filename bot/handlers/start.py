@@ -92,10 +92,25 @@ async def cmd_myid(message: Message):
     )
 
 
+@router.message(Command("menu"))
+async def cmd_menu(message: Message):
+    """Команда /menu - показать главное меню"""
+    is_admin = message.from_user.id in settings.admin_ids_list
+
+    text = """
+🚀 <b>FreedomVPN</b> — твой свободный интернет без границ.
+
+Выберите действие:
+"""
+    await message.answer(text, reply_markup=inline_main_menu(is_admin=is_admin), parse_mode="HTML")
+
+
 @router.message(Command("help"))
 @router.message(F.text == "❓ Помощь")
 async def cmd_help(message: Message):
     """Обработчик команды /help"""
+    is_admin = message.from_user.id in settings.admin_ids_list
+
     help_text = f"""
 📖 <b>Справка по использованию бота:</b>
 
@@ -108,8 +123,9 @@ async def cmd_help(message: Message):
 
 Команды:
 /start - начать работу
+/menu - главное меню
 /help - справка
 /status - проверить статус подписки
 /myid - показать ваш Telegram ID
 """
-    await message.answer(help_text, parse_mode="HTML")
+    await message.answer(help_text, reply_markup=inline_main_menu(is_admin=is_admin), parse_mode="HTML")
