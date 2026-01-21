@@ -103,7 +103,7 @@ class MarzbanService:
         # Ограничиваем имя до 12 символов
         name = (first_name or "User")[:12]
 
-        return f"FreedomVPN {days_left}д {plan_emoji} {name}\n✅ До {expire_date.strftime('%d.%m.%Y')}"
+        return f"FreedomVPN {days_left}д {plan_emoji} {name}\n✅ До {expire_date.strftime('%d.%m.%Y')}\n🤖 t.me/freeddomm_bot"
 
     def calculate_expire_timestamp(self, plan_type: str) -> int:
         """Рассчитать timestamp истечения подписки"""
