@@ -17,54 +17,58 @@ subscription_service = SubscriptionService()
 @router.message(CommandStart())
 async def cmd_start(message: Message, command: CommandObject):
     """Обработчик команды /start"""
-    referrer_id = None
-    referral_message = ""
-    show_trial = True
+    from loguru import logger
+    logger.info(f"START command from user {message.from_user.id}")
 
-    args = command.args
+    try:
+        referrer_id = None
+        referral_message = ""
+        show_trial = True
 
-    async with AsyncSessionLocal() as session:
-        # Проверяем реферальный код
-        if args:
-            # Новый формат: ref_code
-            if args.startswith("ref_"):
-                referrer = await referral_service.get_user_by_referral_code(session, args)
-                if referrer and referrer.telegram_id != message.from_user.id:
-                    referrer_id = referrer.telegram_id
-                    referral_message = f"\n\n🎁 Вы пришли по реферальной ссылке от {referrer.first_name or 'пользователя'}!"
-            # Старый формат: telegram_id
-            elif args.isdigit():
-                referrer_id = int(args)
-                if referrer_id == message.from_user.id:
-                    referrer_id = None
+        args = command.args
 
-        # Создаём или обновляем пользователя
-        user = await UserService.get_or_create_user(
-            session,
-            telegram_id=message.from_user.id,
-            username=message.from_user.username,
-            first_name=message.from_user.first_name,
-            last_name=message.from_user.last_name,
-            referrer_id=referrer_id,
-        )
+        async with AsyncSessionLocal() as session:
+            # Проверяем реферальный код
+            if args:
+                # Новый формат: ref_code
+                if args.startswith("ref_"):
+                    referrer = await referral_service.get_user_by_referral_code(session, args)
+                    if referrer and referrer.telegram_id != message.from_user.id:
+                        referrer_id = referrer.telegram_id
+                        referral_message = f"\n\n🎁 Вы пришли по реферальной ссылке от {referrer.first_name or 'пользователя'}!"
+                # Старый формат: telegram_id
+                elif args.isdigit():
+                    referrer_id = int(args)
+                    if referrer_id == message.from_user.id:
+                        referrer_id = None
 
-        # Проверяем, является ли пользователь админом
-        is_admin = user.telegram_id in settings.admin_ids_list
+            # Создаём или обновляем пользователя
+            user = await UserService.get_or_create_user(
+                session,
+                telegram_id=message.from_user.id,
+                username=message.from_user.username,
+                first_name=message.from_user.first_name,
+                last_name=message.from_user.last_name,
+                referrer_id=referrer_id,
+            )
 
-        # Проверяем, использовал ли пользователь тестовый период
-        show_trial = not await subscription_service.has_used_trial(session, message.from_user.id)
+            # Проверяем, является ли пользователь админом
+            is_admin = user.telegram_id in settings.admin_ids_list
 
-        if is_admin and not user.is_admin:
-            user.is_admin = True
+            # Проверяем, использовал ли пользователь тестовый период
+            show_trial = not await subscription_service.has_used_trial(session, message.from_user.id)
+
+            if is_admin and not user.is_admin:
+                user.is_admin = True
+                await session.commit()
+
             await session.commit()
 
-        await session.commit()
+        import html
+        safe_first_name = html.escape(message.from_user.first_name or "друг")
 
-    import html
-    safe_first_name = html.escape(message.from_user.first_name or "друг")
-
-    if show_trial:
-        welcome_text = f"""
+        if show_trial:
+            welcome_text = f"""
 👋 Привет, {safe_first_name}!
 
 🚀 <b>FreedomVPN</b> — твой свободный интернет без границ.
@@ -80,8 +84,8 @@ async def cmd_start(message: Message, command: CommandObject):
 
 👇 Начни прямо сейчас!
 """
-    else:
-        welcome_text = f"""
+        else:
+            welcome_text = f"""
 👋 С возвращением, {safe_first_name}!
 
 🚀 <b>FreedomVPN</b> — твой свободный интернет без границ.
@@ -89,12 +93,18 @@ async def cmd_start(message: Message, command: CommandObject):
 👇 Выберите действие:
 """
 
-    # Убираем старую reply-клавиатуру и отправляем inline-кнопки
-    await message.answer(
-        welcome_text + referral_message,
-        reply_markup=inline_main_menu(is_admin=is_admin, show_trial=show_trial),
-        parse_mode="HTML"
-    )
+        # Убираем старую reply-клавиатуру и отправляем inline-кнопки
+        await message.answer(
+            welcome_text + referral_message,
+            reply_markup=inline_main_menu(is_admin=is_admin, show_trial=show_trial),
+            parse_mode="HTML"
+        )
+        logger.info(f"START command completed for user {message.from_user.id}")
+    except Exception as e:
+        logger.error(f"START command FAILED for user {message.from_user.id}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        await message.answer("Произошла ошибка. Попробуйте ещё раз /start")
 
 
 @router.message(Command("myid"))
