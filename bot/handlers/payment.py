@@ -117,6 +117,7 @@ async def process_trial_subscription(callback: CallbackQuery):
                 telegram_id=callback.from_user.id,
                 plan_type="trial",
                 first_name=callback.from_user.first_name or "User",
+                telegram_username=callback.from_user.username,
             )
             await session.commit()
 
@@ -210,7 +211,8 @@ async def process_balance_payment(callback: CallbackQuery):
             )
         else:
             subscription = await subscription_service.create_subscription(
-                session, callback.from_user.id, plan_type, first_name
+                session, callback.from_user.id, plan_type, first_name,
+                telegram_username=callback.from_user.username
             )
 
         # Начисляем реферальный бонус пригласившему (даже при оплате с баланса? Да, почему нет, если деньги реальные были)
@@ -232,6 +234,7 @@ async def process_card_payment_logic(callback: CallbackQuery, state: FSMContext,
                 session,
                 telegram_id=callback.from_user.id,
                 plan_type=plan_type,
+                telegram_username=callback.from_user.username,
             )
             await session.commit()
 
@@ -308,6 +311,7 @@ async def check_payment_status(callback: CallbackQuery, state: FSMContext):
                         telegram_id=callback.from_user.id,
                         plan_type=payment.plan_type,
                         first_name=first_name,
+                        telegram_username=callback.from_user.username,
                     )
 
                 # Начисляем реферальный бонус

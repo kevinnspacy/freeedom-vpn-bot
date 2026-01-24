@@ -69,28 +69,19 @@ class MarzbanService:
             return response.json() if response.text else {}
 
     @staticmethod
-    def generate_username(telegram_id: int, first_name: str = "User", plan_type: str = "sub") -> str:
-        """Генерация информативного username для Marzban (отображается в VPN-клиенте через {USERNAME})"""
-        import re
-        # Очищаем имя от спецсимволов, оставляем только буквы и цифры
-        clean_name = re.sub(r'[^a-zA-Zа-яА-ЯёЁ0-9]', '', first_name or "User")[:8]
-        # Транслитерация кириллицы
-        translit_map = {
-            'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
-            'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
-            'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
-            'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch',
-            'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya'
-        }
-        name_translit = ''.join(translit_map.get(c.lower(), c) for c in clean_name).lower()
-        if not name_translit:
-            name_translit = "user"
-
-        # Короткий суффикс для уникальности
-        random_suffix = ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(4))
-
-        # Формат: FreedomVPN_Имя_суффикс (для красивого отображения в клиенте)
-        return f"FreedomVPN_{name_translit}_{random_suffix}"
+    def generate_username(telegram_id: int, telegram_username: Optional[str] = None) -> str:
+        """
+        Генерация информативного username для Marzban.
+        Формат: user_{telegram_id}_{telegram_username}
+        Пример: user_123456789_durov
+        """
+        if telegram_username:
+            import re
+            # Очищаем username от спецсимволов, оставляем только буквы, цифры и underscore
+            clean_username = re.sub(r'[^a-zA-Z0-9_]', '', telegram_username)
+            return f"user_{telegram_id}_{clean_username}"
+        else:
+            return f"user_{telegram_id}"
 
     def _generate_note(self, plan_type: str, first_name: str, expire_timestamp: int) -> str:
         """Генерация note для отображения в VPN-клиенте (как у Sparta VPN)"""
@@ -131,6 +122,7 @@ class MarzbanService:
         telegram_id: int,
         plan_type: str,
         first_name: str = "User",
+        telegram_username: Optional[str] = None,
         data_limit_gb: int = 0  # 0 = безлимит
     ) -> Dict[str, Any]:
         """
@@ -139,7 +131,7 @@ class MarzbanService:
         Returns:
             Dict с данными пользователя включая subscription_url
         """
-        username = self.generate_username(telegram_id, first_name, plan_type)
+        username = self.generate_username(telegram_id, telegram_username)
         expire_timestamp = self.calculate_expire_timestamp(plan_type)
 
         # Генерируем note для отображения в VPN-клиенте

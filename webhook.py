@@ -37,6 +37,7 @@ async def yukassa_webhook(request: Request):
 
                 telegram_id = int(metadata.get("telegram_id"))
                 plan_type = metadata.get("plan_type")
+                telegram_username = metadata.get("telegram_username")
 
                 # Проверяем, есть ли активная подписка
                 existing_subscription = await subscription_service.get_active_subscription(
@@ -51,7 +52,8 @@ async def yukassa_webhook(request: Request):
                 else:
                     # Создаём новую подписку
                     await subscription_service.create_subscription(
-                        session, telegram_id, plan_type
+                        session, telegram_id, plan_type,
+                        telegram_username=telegram_username
                     )
 
                 # Начисляем реферальный бонус

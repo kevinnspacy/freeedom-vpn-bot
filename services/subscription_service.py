@@ -7,6 +7,8 @@ from services.marzban_service import marzban_service
 from loguru import logger
 
 
+from typing import Optional
+
 class SubscriptionService:
     """Сервис для работы с подписками (VLESS + Reality через Marzban)"""
 
@@ -36,6 +38,7 @@ class SubscriptionService:
         telegram_id: int,
         plan_type: str,
         first_name: str = "User",
+        telegram_username: Optional[str] = None,
     ) -> Subscription:
         """Создать новую подписку через Marzban (VLESS + Reality)"""
 
@@ -44,7 +47,8 @@ class SubscriptionService:
             marzban_user = await marzban_service.create_user(
                 telegram_id=telegram_id,
                 plan_type=plan_type,
-                first_name=first_name
+                first_name=first_name,
+                telegram_username=telegram_username
             )
             marzban_username = marzban_user.get("username")
             subscription_url = marzban_user.get("subscription_url", "")

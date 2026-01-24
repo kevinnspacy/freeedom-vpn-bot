@@ -65,6 +65,7 @@ class PaymentService:
         telegram_id: int,
         plan_type: str,
         return_url: str | None = None,
+        telegram_username: str | None = None,
     ) -> Payment:
         """Создать платёж через ЮKassa"""
 
@@ -75,6 +76,13 @@ class PaymentService:
         idempotence_key = str(uuid.uuid4())
 
         try:
+            metadata = {
+                "telegram_id": telegram_id,
+                "plan_type": plan_type,
+            }
+            if telegram_username:
+                metadata["telegram_username"] = telegram_username
+
             # Создаём платёж в ЮKassa
             yukassa_payment = YooPayment.create({
                 "amount": {
@@ -87,10 +95,7 @@ class PaymentService:
                 },
                 "capture": True,
                 "description": description,
-                "metadata": {
-                    "telegram_id": telegram_id,
-                    "plan_type": plan_type,
-                }
+                "metadata": metadata
             }, idempotence_key)
 
             # Сохраняем платёж в БД
